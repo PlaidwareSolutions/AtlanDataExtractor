@@ -1,0 +1,207 @@
+
+
+
+GET CONNECTIONS : URL : https://atlan.com/api/getConnections 
+==================================================================
+GET CONNECTIONS : POST BODY
+==================================================================
+{
+  "dsl": {
+    "size": 400,
+    "sort": [
+      {
+        "__timestamp.date": {
+          "format": "epoch_second",
+          "order": "desc"
+        }
+      }
+    ],
+    "query": {},
+    "post_filter": {},
+    "aggs": {}
+  },
+  "attributes": [
+    "connectorName",
+    "isPartial"
+  ],
+  "suppressLogs": true,
+  "requestMetadata": {
+    "utmTags": [
+      "page_glossary",
+      "project_webapp",
+      "action_bootstrap",
+      "action_fetch_connections"
+    ]
+  }
+}
+
+==================================================================
+GET CONNECTIONS : RESPONSE
+==================================================================
+{
+  "queryType": "INDEX",
+  "searchParameters": {},
+  "entities": [
+    {
+      "typeName": "Connection",
+      "attributes": {
+        "qualifiedName": "default/databricks/1748629796",
+        "name": "odessa-dev-new",
+        "connectorName": "databricks",
+        "category": "lake"
+      },
+      "displayText": "odessa-dev-new",
+      "createdBy": "atlansupport",
+      "updatedBy": "atlansupport",
+      "createTime": 1748635725374,
+      "updateTime": 1748635725374
+    },
+    {
+      "typeName": "Connection",
+      "attributes": {
+        "qualifiedName": "default/api/1747825876",
+        "name": "graphql-sandbox",
+        "connectorName": "api",
+        "category": "API"
+      },
+      "displayText": "graphql-sandbox",
+      "createdBy": "atlansupport",
+      "updatedBy": "atlansupport",
+      "createTime": 1747825877222,
+      "updateTime": 1747825877222
+    }
+  ],
+  "approximateCount": 43,
+  "aggregations": {}
+}
+
+
+
+
+
+
+
+
+GET DATABASES : URL : https://atlan.com/api/getDatabases 
+==================================================================
+GET DATABASES : POST BODY
+==================================================================
+
+{
+  "dsl": {
+    "sort": [
+      {
+        "name.keyword": {
+          "order": "asc"
+        }
+      }
+    ],
+    "size": 300,
+    "query": {
+      "bool": {
+        "filter": {
+          "bool": {
+            "must": [
+              {
+                "term": {
+                  "__state": "ACTIVE"
+                }
+              },
+              {
+                "bool": {
+                  "should": [
+                    {
+                      "term": {
+                        "__typeName.keyword": "Database"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "bool": {
+                  "filter": {
+                    "term": {
+                      "connectionQualifiedName": "default/databricks/1745542051"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "attributes": [
+    "name",
+    "displayName"
+  ],
+  "relationAttributes": [],
+  "suppressLogs": true,
+  "requestMetadata": {},
+  "async": {
+    "isCallAsync": true,
+    "searchContextId": "f53f9d56-976e-4ec9-8cbc-a8c1d931a12a",
+    "searchContextSequenceNo": 1,
+    "requestTimeoutInSecs": 30
+  },
+  "excludeClassifications": false,
+  "includeClassificationNames": false,
+  "excludeMeanings": false,
+  "showSearchScore": false
+}
+
+==================================================================
+GET DATABASES : RESPONSE 
+==================================================================
+{
+  "queryType": "INDEX",
+  "searchParameters": {},
+  "entities": [
+    {
+      "typeName": "Database",
+      "attributes": {
+        "qualifiedName": "default/databricks/1745542051/103027_ctg_dev",
+        "name": "103027_ctg_dev",
+        "description": "Catalog For Seal: 103027"
+      },
+      "guid": "3f4988f7-3f49-40c1-8e02-f23b6aba2f3b",
+      "status": "ACTIVE",
+      "displayText": "103027_ctg_dev",
+      "classificationNames": [],
+      "classifications": [],
+      "meaningNames": [],
+      "meanings": [],
+      "isIncomplete": false,
+      "labels": [],
+      "createdBy": "nawaz.f.khaja@jpmorgan.com",
+      "updatedBy": "atlalansupport",
+      "createTime": 1745543118290,
+      "updateTime": 1748449415976
+    },
+    {
+      "typeName": "Database",
+      "attributes": {
+        "qualifiedName": "default/databricks/1745542051/103118_ctg_dev",
+        "name": "103118_ctg_dev"
+      },
+      "guid": "e8a6f2e6-6cc6-4c12-ab91-6a3e1288937d",
+      "status": "ACTIVE",
+      "displayText": "103118_ctg_dev",
+      "classificationNames": [],
+      "classifications": [],
+      "meaningNames": [],
+      "meanings": [],
+      "isIncomplete": false,
+      "labels": [],
+      "createdBy": "nawaz.f.khaja@jpmorgan.com",
+      "updatedBy": "atlalansupport",
+      "createTime": 1745543118290,
+      "updateTime": 1748449449302
+    }
+  ],
+  "approximateCount": 23
+}
+
+
