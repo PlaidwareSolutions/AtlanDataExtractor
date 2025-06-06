@@ -343,14 +343,14 @@ class TestAtlanExtractor(unittest.TestCase):
         
         self.assertFalse(os.path.exists(csv_file))
 
-    @patch('builtins.open', side_effect=IOError("Permission denied"))
-    def test_export_connections_to_csv_io_error(self, mock_open):
+    def test_export_connections_to_csv_io_error(self):
         """Test connections CSV export with IO error"""
         connections = [{'connection_name': 'test'}]
         
         extractor = AtlanExtractor(self.config_file)
         # Should not raise exception, just log error
-        extractor.export_connections_to_csv(connections, '/invalid/path/file.csv')
+        with patch('builtins.open', side_effect=IOError("Permission denied")):
+            extractor.export_connections_to_csv(connections, '/invalid/path/file.csv')
 
     def test_export_databases_to_csv_success(self):
         """Test successful databases CSV export"""
@@ -387,14 +387,14 @@ class TestAtlanExtractor(unittest.TestCase):
         
         self.assertFalse(os.path.exists(csv_file))
 
-    @patch('builtins.open', side_effect=IOError("Permission denied"))
-    def test_export_databases_to_csv_io_error(self, mock_open):
+    def test_export_databases_to_csv_io_error(self):
         """Test databases CSV export with IO error"""
         databases = [{'name': 'test'}]
         
         extractor = AtlanExtractor(self.config_file)
         # Should not raise exception, just log error
-        extractor.export_databases_to_csv(databases, '/invalid/path/file.csv')
+        with patch('builtins.open', side_effect=IOError("Permission denied")):
+            extractor.export_databases_to_csv(databases, '/invalid/path/file.csv')
 
     @patch('main.AtlanExtractor.get_connections')
     @patch('main.AtlanExtractor.get_databases')
