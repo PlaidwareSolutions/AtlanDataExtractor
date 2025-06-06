@@ -1,0 +1,7 @@
+# Atlan Data Extractor - Project Dependencies
+# 
+# Core dependencies for the Atlan Data Extractor script
+# Install these packages using: pip install -r project_requirements.txt
+
+requests>=2.32.0
+coverage>=7.8.0
