@@ -1,6 +1,6 @@
 {
   "connections_api": {
-    "url": "https://atlan.com/api/getConnections",
+    "url": "https://jpmc.atlan.com/api/getConnections",
     "payload": {
       "dsl": {
         "size": 400,
@@ -32,7 +32,7 @@
     }
   },
   "databases_api": {
-    "url": "https://atlan.com/api/getDatabases",
+    "url": "https://jpmc.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
