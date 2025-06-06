@@ -1,0 +1,3 @@
+connection_name,connection_qualified_name,connector_name,category,created_by,updated_by,create_time,update_time
+odessa-dev-new,default/databricks/1748629796,databricks,lake,atlansupport,atlansupport,1748635725374,1748635725374
+graphql-sandbox,default/api/1747825876,api,API,atlansupport,atlansupport,1747825877222,1747825877222

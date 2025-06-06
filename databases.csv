@@ -1,0 +1,3 @@
+type_name,qualified_name,name,created_by,updated_by,create_time,update_time,connection_qualified_name
+Database,default/databricks/1745542051/103027_ctg_dev,103027_ctg_dev,nawaz.f.khaja@jpmorgan.com,atlalansupport,1745543118290,1748449415976,default/databricks/1748629796
+Database,default/databricks/1745542051/103118_ctg_dev,103118_ctg_dev,nawaz.f.khaja@jpmorgan.com,atlalansupport,1745543118290,1748449449302,default/databricks/1748629796
