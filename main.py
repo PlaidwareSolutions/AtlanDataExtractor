@@ -162,7 +162,8 @@ def get_connections():
             attributes = entity.get('attributes', {})
             connection_data = {
                 'connection_name': attributes.get('name', ''),
-                'connection_qualified_name': attributes.get('qualifiedName', ''),
+                'connection_qualified_name':
+                attributes.get('qualifiedName', ''),
                 'connector_name': attributes.get('connectorName', ''),
                 'category': attributes.get('category', ''),
                 'updated_by': entity.get('updatedBy', ''),
@@ -181,7 +182,7 @@ def get_connections():
     return connections
 
 
-def get_databases(connection_qualified_name):
+def get_databases(connection_qualified_name, connector_name):
     """
     Fetch databases associated with a specific connection from Atlan databases API.
     
@@ -204,8 +205,8 @@ def get_databases(connection_qualified_name):
         f"Fetching databases for connection: {connection_qualified_name}")
 
     # Get API endpoint and payload template from configuration
-    url = config['databases_api']['url']
-    payload = config['databases_api']['payload'].copy()
+    url = config[config["api_map"][connector_name]]['url']
+    payload = config[config["api_map"][connector_name]]['payload'].copy()
 
     # Update payload with specific connection qualified name
     # Navigate through nested dictionary structure to set the filter value
@@ -365,9 +366,11 @@ def main():
     all_databases = []
     for connection in connections:
         connection_qualified_name = connection.get('connection_qualified_name')
+        connector_name = connection.get('connector_name')
         if connection_qualified_name:
             # Fetch databases associated with this connection
-            databases = get_databases(connection_qualified_name)
+            databases = get_databases(connection_qualified_name,
+                                      connector_name)
             all_databases.extend(databases)
         else:
             # Log warning for connections without qualified names
