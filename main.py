@@ -13,7 +13,7 @@ The script performs the following operations:
 5. For each connection, fetches associated databases
 6. Exports all databases data to databases.csv
 
-Author: AI Assistant
+Author: Nawaz Mohammad (U787320)
 Version: 1.0
 Dependencies: requests, json, csv, logging, sys, os
 """
@@ -27,12 +27,13 @@ import os
 
 # Configure logging to both file and console for comprehensive monitoring
 # Log level INFO provides detailed execution flow without debug verbosity
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    handlers=[
-                        logging.FileHandler('atlan_extractor.log'),  # Persistent log file
-                        logging.StreamHandler(sys.stdout)           # Real-time console output
-                    ])
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('atlan_extractor.log'),  # Persistent log file
+        logging.StreamHandler(sys.stdout)  # Real-time console output
+    ])
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +62,14 @@ def get_auth_token():
     if not token:
         # Fallback to config file
         token = config.get('auth_token', '')
-    
+
     # Validate token exists
     if not token:
-        logger.error("No authentication token found. Please set ATLAN_AUTH_TOKEN environment variable or add auth_token to config.json")
+        logger.error(
+            "No authentication token found. Please set ATLAN_AUTH_TOKEN environment variable or add auth_token to config.json"
+        )
         sys.exit(1)
-    
+
     # Ensure proper Bearer format
     if token.lower().startswith('bearer '):
         return token
@@ -92,7 +95,7 @@ def make_api_request(url, payload):
         'Authorization': get_auth_token(),
         'Content-Type': 'application/json'
     }
-    
+
     response = None  # Initialize response variable for proper scope
     try:
         # Make POST request with timeout to prevent hanging
@@ -136,7 +139,7 @@ def get_connections():
               - update_time: Timestamp when connection was last updated
     """
     logger.info("Fetching connections from Atlan API")
-    
+
     # Get API endpoint and payload from configuration
     url = config['connections_api']['url']
     payload = config['connections_api']['payload'].copy()
@@ -150,7 +153,7 @@ def get_connections():
     # Extract entities from response
     entities = response.get('entities', [])
     logger.info(f"Retrieved {len(entities)} connections from Atlan API")
-    
+
     # Process each connection entity
     connections = []
     for entity in entities:
@@ -159,7 +162,8 @@ def get_connections():
             attributes = entity.get('attributes', {})
             connection_data = {
                 'connection_name': attributes.get('name', ''),
-                'connection_qualified_name': attributes.get('qualifiedName', ''),
+                'connection_qualified_name':
+                attributes.get('qualifiedName', ''),
                 'connector_name': attributes.get('connectorName', ''),
                 'category': attributes.get('category', ''),
                 'updated_by': entity.get('updatedBy', ''),
@@ -168,12 +172,13 @@ def get_connections():
                 'update_time': entity.get('updateTime', '')
             }
             connections.append(connection_data)
-            logger.debug(f"Processed connection: {connection_data['connection_name']}")
+            logger.debug(
+                f"Processed connection: {connection_data['connection_name']}")
         except Exception as e:
             # Log warning but continue processing other connections
             logger.warning(f"Failed to process connection entity: {e}")
             continue
-    
+
     return connections
 
 
@@ -196,30 +201,38 @@ def get_databases(connection_qualified_name):
               - create_time: Timestamp when database was created
               - update_time: Timestamp when database was last updated
     """
-    logger.info(f"Fetching databases for connection: {connection_qualified_name}")
-    
+    logger.info(
+        f"Fetching databases for connection: {connection_qualified_name}")
+
     # Get API endpoint and payload template from configuration
     url = config['databases_api']['url']
     payload = config['databases_api']['payload'].copy()
-    
+
     # Update payload with specific connection qualified name
     # Navigate through nested dictionary structure to set the filter value
     try:
-        payload['dsl']['query']['bool']['filter']['bool']['must'][2]['bool']['filter']['term']['connectionQualifiedName'] = connection_qualified_name
+        payload['dsl']['query']['bool']['filter']['bool']['must'][2]['bool'][
+            'filter']['term'][
+                'connectionQualifiedName'] = connection_qualified_name
     except (KeyError, IndexError) as e:
-        logger.error(f"Failed to update payload with connection qualified name: {e}")
+        logger.error(
+            f"Failed to update payload with connection qualified name: {e}")
         return []
 
     # Make API request to fetch databases for this connection
     response = make_api_request(url, payload)
     if not response:
-        logger.warning(f"Failed to fetch databases for connection: {connection_qualified_name}")
+        logger.warning(
+            f"Failed to fetch databases for connection: {connection_qualified_name}"
+        )
         return []
 
     # Extract entities from response
     entities = response.get('entities', [])
-    logger.info(f"Retrieved {len(entities)} databases for connection: {connection_qualified_name}")
-    
+    logger.info(
+        f"Retrieved {len(entities)} databases for connection: {connection_qualified_name}"
+    )
+
     # Process each database entity
     databases = []
     for entity in entities:
@@ -242,7 +255,7 @@ def get_databases(connection_qualified_name):
             # Log warning but continue processing other databases
             logger.warning(f"Failed to process database entity: {e}")
             continue
-    
+
     return databases
 
 
@@ -264,15 +277,15 @@ def export_connections_to_csv(connections, filename='connections.csv'):
     if not connections:
         logger.warning("No connections data to export")
         return
-    
+
     logger.info(f"Exporting {len(connections)} connections to {filename}")
-    
+
     # Define CSV column headers matching the connection data structure
     fieldnames = [
         'connection_name', 'connection_qualified_name', 'connector_name',
         'category', 'created_by', 'updated_by', 'create_time', 'update_time'
     ]
-    
+
     try:
         # Write connections data to CSV file with UTF-8 encoding
         with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
@@ -303,15 +316,15 @@ def export_databases_to_csv(databases, filename='databases.csv'):
     if not databases:
         logger.warning("No databases data to export")
         return
-    
+
     logger.info(f"Exporting {len(databases)} databases to {filename}")
-    
+
     # Define CSV column headers matching the database data structure
     fieldnames = [
         'type_name', 'qualified_name', 'name', 'created_by', 'updated_by',
         'create_time', 'update_time', 'connection_qualified_name'
     ]
-    
+
     try:
         # Write databases data to CSV file with UTF-8 encoding
         with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
@@ -339,13 +352,13 @@ def main():
         SystemExit: If no connections are found or critical errors occur
     """
     logger.info("Starting Atlan data extraction process")
-    
+
     # Step 1: Fetch connections from Atlan API
     connections = get_connections()
     if not connections:
         logger.error("No connections found. Exiting.")
         sys.exit(1)
-    
+
     # Step 2: Export connections to CSV file
     export_connections_to_csv(connections)
 
@@ -360,10 +373,10 @@ def main():
         else:
             # Log warning for connections without qualified names
             logger.warning(f"Connection missing qualified name: {connection}")
-    
+
     # Step 4: Export all databases to CSV file
     export_databases_to_csv(all_databases)
-    
+
     # Step 5: Log completion summary
     logger.info(
         f"Data extraction completed successfully. "
