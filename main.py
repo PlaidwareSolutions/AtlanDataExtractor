@@ -42,6 +42,12 @@ logger = logging.getLogger(__name__)
 with open('config.json', 'r') as f:
     config = json.load(f)
 
+# Create output directory for CSV files if it doesn't exist
+OUTPUT_DIR = 'output'
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+    logger.info(f"Created output directory: {OUTPUT_DIR}")
+
 
 def get_auth_token():
     """
@@ -287,12 +293,14 @@ def export_connections_to_csv(connections, filename='connections.csv'):
     ]
 
     try:
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
         # Write connections data to CSV file with UTF-8 encoding
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()  # Write column headers
             writer.writerows(connections)  # Write data rows
-            logger.info(f"Successfully exported connections to {filename}")
+            logger.info(f"Successfully exported connections to {filepath}")
     except IOError as e:
         # Handle file permission or disk space errors
         logger.error(f"Failed to write connections CSV file: {e}")
@@ -326,12 +334,14 @@ def export_databases_to_csv(databases, filename='databases.csv'):
     ]
 
     try:
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
         # Write databases data to CSV file with UTF-8 encoding
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()  # Write column headers
             writer.writerows(databases)  # Write data rows
-            logger.info(f"Successfully exported databases to {filename}")
+            logger.info(f"Successfully exported databases to {filepath}")
     except IOError as e:
         # Handle file permission or disk space errors
         logger.error(f"Failed to write databases CSV file: {e}")

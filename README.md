@@ -22,8 +22,10 @@ atlan-data-extractor/
 ├── test_atlan_extractor.py   # Comprehensive unit tests
 ├── project_requirements.txt  # Project dependencies
 ├── README.md                 # This file
-├── connections.csv           # Generated connections output
-└── databases.csv            # Generated databases output
+├── atlan_extractor.log       # Execution log file
+└── output/                   # Output directory for CSV files
+    ├── connections.csv       # Generated connections output
+    └── databases.csv        # Generated databases output
 ```
 
 ## Requirements
@@ -141,9 +143,9 @@ ATLAN_AUTH_TOKEN="your_token" python main.py
 
 ### Expected Output
 
-The script will generate two CSV files:
+The script will generate two CSV files in the `output/` directory:
 
-**connections.csv** - Contains connection data with columns:
+**output/connections.csv** - Contains connection data with columns:
 - connection_name
 - connection_qualified_name
 - connector_name
@@ -153,7 +155,7 @@ The script will generate two CSV files:
 - create_time
 - update_time
 
-**databases.csv** - Contains database data with columns:
+**output/databases.csv** - Contains database data with columns:
 - type_name
 - qualified_name
 - name
@@ -166,11 +168,12 @@ The script will generate two CSV files:
 ### Execution Flow
 
 1. **Load Configuration**: Reads API endpoints and authentication from config.json
-2. **Fetch Connections**: Makes POST request to connections API
-3. **Export Connections**: Saves connection data to connections.csv
-4. **Fetch Databases**: For each connection, fetches associated databases
-5. **Export Databases**: Saves all database data to databases.csv
-6. **Logging**: All operations are logged to console and atlan_extractor.log
+2. **Create Output Directory**: Creates `output/` directory if it doesn't exist
+3. **Fetch Connections**: Makes POST request to connections API
+4. **Export Connections**: Saves connection data to output/connections.csv
+5. **Fetch Databases**: For each connection, fetches associated databases
+6. **Export Databases**: Saves all database data to output/databases.csv
+7. **Logging**: All operations are logged to console and atlan_extractor.log
 
 ## Testing
 
@@ -254,13 +257,13 @@ Log levels include:
 
 ## Data Output Format
 
-### Connections CSV Structure
+### Connections CSV Structure (output/connections.csv)
 ```csv
 connection_name,connection_qualified_name,connector_name,category,created_by,updated_by,create_time,update_time
 odessa-dev,default/databricks/123,databricks,lake,user@company.com,user@company.com,1748635725374,1748635725374
 ```
 
-### Databases CSV Structure
+### Databases CSV Structure (output/databases.csv)
 ```csv
 type_name,qualified_name,name,created_by,updated_by,create_time,update_time,connection_qualified_name
 Database,default/databricks/123/db1,db1,user@company.com,user@company.com,1745543118290,1748449415976,default/databricks/123
