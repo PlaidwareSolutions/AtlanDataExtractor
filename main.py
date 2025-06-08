@@ -286,44 +286,103 @@ def export_connections_to_csv(connections, filename='connections.csv'):
 
 
 def export_databases_to_csv(databases, filename='databases.csv'):
+    """
+    Export databases data to CSV file with proper formatting and error handling.
+    
+    Args:
+        databases (list): List of database dictionaries to export
+        filename (str): Output CSV filename (default: 'databases.csv')
+        
+    Returns:
+        None: Function writes to file and logs results
+        
+    Raises:
+        None: All exceptions are caught and logged
+    """
+    # Check if there's data to export
     if not databases:
         logger.warning("No databases data to export")
         return
+    
     logger.info(f"Exporting {len(databases)} databases to {filename}")
+    
+    # Define CSV column headers matching the database data structure
     fieldnames = [
         'type_name', 'qualified_name', 'name', 'created_by', 'updated_by',
         'create_time', 'update_time', 'connection_qualified_name'
     ]
+    
     try:
+        # Write databases data to CSV file with UTF-8 encoding
         with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(databases)
+            writer.writeheader()  # Write column headers
+            writer.writerows(databases)  # Write data rows
             logger.info(f"Successfully exported databases to {filename}")
     except IOError as e:
+        # Handle file permission or disk space errors
         logger.error(f"Failed to write databases CSV file: {e}")
 
 
 def main():
+    """
+    Main execution function that orchestrates the complete data extraction workflow.
+    
+    Workflow steps:
+    1. Fetch all connections from Atlan connections API
+    2. Export connections data to CSV file
+    3. For each connection, fetch associated databases
+    4. Export all databases data to CSV file
+    5. Log completion summary
+    
+    Raises:
+        SystemExit: If no connections are found or critical errors occur
+    """
+    logger.info("Starting Atlan data extraction process")
+    
+    # Step 1: Fetch connections from Atlan API
     connections = get_connections()
     if not connections:
         logger.error("No connections found. Exiting.")
         sys.exit(1)
+    
+    # Step 2: Export connections to CSV file
     export_connections_to_csv(connections)
 
+    # Step 3: Fetch databases for each connection
     all_databases = []
     for connection in connections:
         connection_qualified_name = connection.get('connection_qualified_name')
         if connection_qualified_name:
+            # Fetch databases associated with this connection
             databases = get_databases(connection_qualified_name)
             all_databases.extend(databases)
         else:
+            # Log warning for connections without qualified names
             logger.warning(f"Connection missing qualified name: {connection}")
+    
+    # Step 4: Export all databases to CSV file
     export_databases_to_csv(all_databases)
+    
+    # Step 5: Log completion summary
     logger.info(
-        f"Data extraction completed successfully. Processed {len(connections)} connections and {len(all_databases)} databases."
+        f"Data extraction completed successfully. "
+        f"Processed {len(connections)} connections and {len(all_databases)} databases."
     )
 
 
 if __name__ == '__main__':
-    main()
+    """
+    Entry point for script execution.
+    
+    This block ensures the main() function is only called when the script
+    is executed directly, not when imported as a module.
+    """
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("Process interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
