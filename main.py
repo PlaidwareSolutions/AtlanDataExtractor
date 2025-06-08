@@ -162,8 +162,7 @@ def get_connections():
             attributes = entity.get('attributes', {})
             connection_data = {
                 'connection_name': attributes.get('name', ''),
-                'connection_qualified_name':
-                attributes.get('qualifiedName', ''),
+                'connection_qualified_name': attributes.get('qualifiedName', ''),
                 'connector_name': attributes.get('connectorName', ''),
                 'category': attributes.get('category', ''),
                 'updated_by': entity.get('updatedBy', ''),
