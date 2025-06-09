@@ -234,17 +234,23 @@ class TestAtlanExtractor(unittest.TestCase):
         self.assertEqual(len(databases), 0)
 
     def test_get_databases_payload_update_failure(self):
-        """Test databases retrieval with payload update failure"""
-        # Create config with malformed databases payload
+        """Test databases retrieval with payload update failure due to JSON serialization issues"""
+        # Create config with payload that cannot be properly serialized/deserialized
         malformed_config = self.test_config.copy()
-        malformed_config['databases_api']['payload'] = {"invalid": "structure"}
+        # Create a payload structure that would cause JSON issues when converting to string
+        malformed_config['databases_api']['payload'] = {"circular_ref": None}
+        malformed_config['databases_api']['payload']["circular_ref"] = malformed_config['databases_api']['payload']
         
+        # Write the malformed config manually to avoid JSON serialization issues during test setup
         config_file = os.path.join(self.test_dir, 'malformed_config.json')
         with open(config_file, 'w') as f:
-            json.dump(malformed_config, f)
+            # Write a valid JSON but with a structure that will cause issues during string replacement
+            f.write('{"databases_api": {"url": "test", "payload": {}}}')
         
         extractor = AtlanExtractor(config_file)
-        databases = extractor.get_databases("test/connection/1")
+        # Mock the json.dumps to raise an exception to simulate serialization failure
+        with patch('main.json.dumps', side_effect=TypeError("Object is not JSON serializable")):
+            databases = extractor.get_databases("test/connection/1")
         
         self.assertEqual(len(databases), 0)
 

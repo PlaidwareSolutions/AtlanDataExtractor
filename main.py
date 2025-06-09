@@ -212,17 +212,18 @@ def get_databases(connection_qualified_name, connector_name):
 
     # Get API endpoint and payload template from configuration
     url = config[config["api_map"][connector_name]]['url']
-    payload = config[config["api_map"][connector_name]]['payload'].copy()
+    payload_template = config[config["api_map"][connector_name]]['payload']
 
-    # Update payload with specific connection qualified name
-    # Navigate through nested dictionary structure to set the filter value
+    # Convert payload to JSON string and replace placeholder with actual connection qualified name
     try:
-        payload['dsl']['query']['bool']['filter']['bool']['must'][2]['bool'][
-            'filter']['term'][
-                'connectionQualifiedName'] = connection_qualified_name
-    except (KeyError, IndexError) as e:
+        payload_json_str = json.dumps(payload_template)
+        # Replace the placeholder with the actual connection qualified name
+        updated_payload_str = payload_json_str.replace("PLACEHOLDER_TO_BE_REPLACED", connection_qualified_name)
+        # Convert back to dictionary
+        payload = json.loads(updated_payload_str)
+    except json.JSONDecodeError as e:
         logger.error(
-            f"Failed to update payload with connection qualified name: {e}")
+            f"Failed to update payload with connection qualified name using string replacement: {e}")
         return []
 
     # Make API request to fetch databases for this connection
