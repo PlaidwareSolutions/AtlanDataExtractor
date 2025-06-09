@@ -2,8 +2,8 @@
 """
 Unit tests for Atlan Data Extractor
 
-This module contains comprehensive test cases for the AtlanExtractor class
-to ensure proper functionality and error handling.
+This module contains comprehensive test cases for the functional
+Atlan data extraction script to ensure proper functionality and error handling.
 """
 
 import unittest
@@ -13,11 +13,11 @@ import os
 import tempfile
 import shutil
 from unittest.mock import patch, mock_open, MagicMock
-from main import AtlanExtractor
+import main
 
 
 class TestAtlanExtractor(unittest.TestCase):
-    """Test cases for AtlanExtractor class"""
+    """Test cases for Atlan data extraction functions"""
 
     def setUp(self):
         """Set up test fixtures before each test method"""
