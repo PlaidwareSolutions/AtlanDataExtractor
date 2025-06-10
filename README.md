@@ -205,17 +205,17 @@ python -m coverage html
 
 The updated test suite validates:
 - **String Replacement Functionality**: Tests the new payload modification approach using string search and replace
-- Configuration loading and validation
+- **Configs Directory Structure**: Tests the new configs/ directory for configuration files
+- **URL Logging**: Validates that API URLs are properly logged during requests
+- **Output Directory**: Tests CSV export functionality to output/ directory
 - Authentication token handling (environment vs config)
-- API request success and failure scenarios
-- Data extraction and processing with proper field mapping
-- CSV export functionality to output directory
+- JSON processing and data extraction
 - Error handling and edge cases
-```
+- CSV export functionality
 
 ### Test Coverage Results
 
-The test suite achieves **98% code coverage** with 30 comprehensive test cases covering:
+The test suite achieves comprehensive coverage with 8 focused test cases covering:
 
 - **Configuration Management**: Valid/invalid config files, authentication methods
 - **API Request Handling**: Success scenarios, HTTP errors, network failures, JSON parsing
