@@ -2,7 +2,7 @@
   "auth_token": "ehdasdjfasdfa.asdfasdf",
   "atlan_base_url": "YOUR_ATLAN_INSTANCE_URL",
   "connections_api": {
-    "url": "https://jpmc.atlan.com/api/getConnections",
+    "url": "https://your-org.atlan.com/api/getConnections",
     "payload": {
       "dsl": {
         "size": 400,
@@ -48,7 +48,7 @@
     "teradata"   :"databases_api"
   },
   "databases_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://your-org.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [

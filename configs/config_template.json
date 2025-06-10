@@ -1,0 +1,103 @@
+{
+  "auth_token": "YOUR_ATLAN_API_TOKEN",
+  "atlan_instance_url": "https://your-org.atlan.com",
+  "connections_api": {
+    "endpoint": "/api/getConnections",
+    "payload": {
+      "dsl": {
+        "size": 400,
+        "sort": [
+          {
+            "__timestamp.date": {
+              "format": "epoch_second",
+              "order": "desc"
+            }
+          }
+        ],
+        "query": {},
+        "post_filter": {},
+        "aggs": {}
+      },
+      "attributes": [
+        "connectorName",
+        "isPartial"
+      ],
+      "suppressLogs": true,
+      "requestMetadata": {
+        "utmTags": [
+          "page_glossary",
+          "project_webapp",
+          "action_bootstrap",
+          "action_fetch_connections"
+        ]
+      }
+    }
+  },
+  "databases_api": {
+    "endpoint": "/api/getDatabases",
+    "payload": {
+      "dsl": {
+        "sort": [
+          {
+            "name.keyword": {
+              "order": "asc"
+            }
+          }
+        ],
+        "size": 300,
+        "query": {
+          "bool": {
+            "filter": {
+              "bool": {
+                "must": [
+                  {
+                    "term": {
+                      "__state": "ACTIVE"
+                    }
+                  },
+                  {
+                    "bool": {
+                      "should": [
+                        {
+                          "term": {
+                            "__typeName.keyword": "Database"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "bool": {
+                      "filter": {
+                        "term": {
+                          "connectionQualifiedName": "PLACEHOLDER_TO_BE_REPLACED"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "attributes": [
+        "name",
+        "displayName"
+      ],
+      "relationAttributes": [],
+      "suppressLogs": true,
+      "requestMetadata": {},
+      "async": {
+        "isCallAsync": true,
+        "searchContextId": "f53f9d56-976e-4ec9-8cbc-a8c1d931a12a",
+        "searchContextSequenceNo": 1,
+        "requestTimeoutInSecs": 30
+      },
+      "excludeClassifications": false,
+      "includeClassificationNames": false,
+      "excludeMeanings": false,
+      "showSearchScore": false
+    }
+  }
+}
