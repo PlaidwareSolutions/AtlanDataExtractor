@@ -1,7 +1,7 @@
 {
   "auth_token": "ehdasdjfasdfa.asdfasdf",
   "connections_api": {
-    "url": "https://jpmc.atlan.com/api/getConnections",
+    "url": "https://xyz.atlan.com/api/getConnections",
     "payload": {
       "dsl": {
         "size": 400,
@@ -47,7 +47,7 @@
     "teradata"   :"databases_api"
   },
   "databases_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -114,7 +114,7 @@
     }
   },
   "alteryx_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -181,7 +181,7 @@
     }
   },
   "api_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -248,7 +248,7 @@
     }
   },
   "file_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -315,7 +315,7 @@
     }
   },
   "mparticle_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -382,7 +382,7 @@
     }
   },
   "spark_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -449,7 +449,7 @@
     }
   },
   "tableau_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -516,7 +516,7 @@
     }
   },
   "thoughtspot_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://xyz.atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
