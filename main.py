@@ -38,8 +38,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Load configuration from JSON file containing API endpoints and payloads
-# This file must exist in the same directory as the script
-with open('config.json', 'r') as f:
+# This file must exist in the configs directory
+with open('configs/config.json', 'r') as f:
     config = json.load(f)
 
 # Create output directory for CSV files if it doesn't exist
@@ -104,6 +104,9 @@ def make_api_request(url, payload):
 
     response = None  # Initialize response variable for proper scope
     try:
+        # Log the URL being used for the API request
+        logger.info(f"Making API request to URL: {url}")
+        
         # Make POST request with timeout to prevent hanging
         response = requests.post(url,
                                  headers=headers,

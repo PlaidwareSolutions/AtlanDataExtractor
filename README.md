@@ -18,7 +18,8 @@ A Python script that extracts connections and databases data from Atlan APIs and
 ```
 atlan-data-extractor/
 ├── main.py                    # Main extractor script
-├── config.json               # Configuration file for API endpoints
+├── configs/                   # Configuration directory
+│   └── config.json           # Configuration file for API endpoints
 ├── test_atlan_extractor.py   # Comprehensive unit tests
 ├── project_requirements.txt  # Project dependencies
 ├── README.md                 # This file
@@ -68,7 +69,7 @@ export ATLAN_AUTH_TOKEN="your_actual_bearer_token_here"
 ```
 
 **Option 2: Configuration File**
-Add your token to the `config.json` file:
+Add your token to the `configs/config.json` file:
 ```json
 {
   "auth_token": "your_actual_bearer_token_here"
@@ -77,7 +78,7 @@ Add your token to the `config.json` file:
 
 ### API Endpoints Configuration
 
-Update the `config.json` file with your Atlan instance details:
+Update the `configs/config.json` file with your Atlan instance details:
 
 ```json
 {
@@ -167,13 +168,13 @@ The script will generate two CSV files in the `output/` directory:
 
 ### Execution Flow
 
-1. **Load Configuration**: Reads API endpoints and authentication from config.json
+1. **Load Configuration**: Reads API endpoints and authentication from configs/config.json
 2. **Create Output Directory**: Creates `output/` directory if it doesn't exist
-3. **Fetch Connections**: Makes POST request to connections API
+3. **Fetch Connections**: Makes POST request to connections API (URL logged)
 4. **Export Connections**: Saves connection data to output/connections.csv
-5. **Fetch Databases**: For each connection, fetches associated databases
+5. **Fetch Databases**: For each connection, fetches associated databases (URLs logged)
 6. **Export Databases**: Saves all database data to output/databases.csv
-7. **Logging**: All operations are logged to console and atlan_extractor.log
+7. **Logging**: All operations, including API URLs, are logged to console and atlan_extractor.log
 
 ## Testing
 

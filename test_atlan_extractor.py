@@ -22,7 +22,9 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures before each test method"""
         self.test_dir = tempfile.mkdtemp()
-        self.config_file = os.path.join(self.test_dir, 'test_config.json')
+        self.configs_dir = os.path.join(self.test_dir, 'configs')
+        os.makedirs(self.configs_dir, exist_ok=True)
+        self.config_file = os.path.join(self.configs_dir, 'config.json')
         self.test_config = {
             "auth_token": "test_token_12345",
             "connections_api": {
