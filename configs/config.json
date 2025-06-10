@@ -1,5 +1,6 @@
 {
   "auth_token": "ehdasdjfasdfa.asdfasdf",
+  "atlan_base_url": "YOUR_ATLAN_INSTANCE_URL",
   "connections_api": {
     "url": "https://jpmc.atlan.com/api/getConnections",
     "payload": {
@@ -114,7 +115,7 @@
     }
   },
   "alteryx_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
@@ -181,7 +182,7 @@
     }
   },
   "api_api": {
-    "url": "https://jpmc.atlan.com/api/getDatabases",
+    "url": "https://atlan.com/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [
