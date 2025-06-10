@@ -106,7 +106,7 @@ def make_api_request(url, payload):
     try:
         # Log the URL being used for the API request
         logger.info(f"Making API request to URL: {url}")
-
+        
         # Make POST request with timeout to prevent hanging
         response = requests.post(url,
                                  headers=headers,
@@ -215,21 +215,18 @@ def get_databases(connection_qualified_name, connector_name):
 
     # Get API endpoint and payload template from configuration
     url = config[config["api_map"][connector_name]]['url']
-    payload_template = config[config["api_map"]
-                              [connector_name]]['payload'].copy()
+    payload_template = config[config["api_map"][connector_name]]['payload']
 
     # Convert payload to JSON string and replace placeholder with actual connection qualified name
     try:
         payload_json_str = json.dumps(payload_template)
         # Replace the placeholder with the actual connection qualified name
-        updated_payload_str = payload_json_str.replace(
-            "PLACEHOLDER_TO_BE_REPLACED", connection_qualified_name)
+        updated_payload_str = payload_json_str.replace("PLACEHOLDER_TO_BE_REPLACED", connection_qualified_name)
         # Convert back to dictionary
         payload = json.loads(updated_payload_str)
     except json.JSONDecodeError as e:
         logger.error(
-            f"Failed to update payload with connection qualified name using string replacement: {e}"
-        )
+            f"Failed to update payload with connection qualified name using string replacement: {e}")
         return []
 
     # Make API request to fetch databases for this connection

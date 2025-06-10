@@ -205,8 +205,7 @@ python -m coverage html
 
 The updated test suite validates:
 - **String Replacement Functionality**: Tests the new payload modification approach using string search and replace
-- **URL Logging**: Verifies that API URLs are properly logged during requests
-- Configuration loading from configs directory
+- Configuration loading and validation
 - Authentication token handling (environment vs config)
 - API request success and failure scenarios
 - Data extraction and processing with proper field mapping

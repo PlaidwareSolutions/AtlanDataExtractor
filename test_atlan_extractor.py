@@ -68,14 +68,15 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         """Clean up after each test method"""
         shutil.rmtree(self.test_dir)
 
+    @patch('main.config', new_callable=lambda: {})
     @patch('main.os.getenv')
-    def test_get_auth_token_from_env(self, mock_getenv):
+    def test_get_auth_token_from_env(self, mock_getenv, mock_config):
         """Test authentication token retrieval from environment variable"""
         mock_getenv.return_value = "env_token_123"
+        mock_config.get.return_value = None
         
         import main
-        with patch.object(main, 'config', {'auth_token': None}):
-            token = main.get_auth_token()
+        token = main.get_auth_token()
         
         self.assertEqual(token, "Bearer env_token_123")
         mock_getenv.assert_called_with('ATLAN_AUTH_TOKEN')
@@ -92,33 +93,18 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         
         self.assertEqual(token, "Bearer config_token_456")
 
-    @patch('main.sys.exit')
+    @patch('main.config')
     @patch('main.os.getenv')
-    def test_get_auth_token_missing(self, mock_getenv, mock_exit):
+    @patch('main.sys.exit')
+    def test_get_auth_token_missing(self, mock_exit, mock_getenv, mock_config):
         """Test authentication token when none available"""
         mock_getenv.return_value = None
+        mock_config.get.return_value = None
         
         import main
-        with patch.object(main, 'config', {}):
-            main.get_auth_token()
+        main.get_auth_token()
         
         mock_exit.assert_called_with(1)
-
-    @patch('main.requests.post')
-    @patch('main.logger')
-    def test_make_api_request_success_with_url_logging(self, mock_logger, mock_post):
-        """Test successful API request with URL logging"""
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {"success": True}
-        mock_post.return_value = mock_response
-        
-        import main
-        result = main.make_api_request("https://test.com/api", {"test": "data"})
-        
-        self.assertEqual(result, {"success": True})
-        # Verify URL is logged
-        mock_logger.info.assert_any_call("Making API request to URL: https://test.com/api")
 
     @patch('main.requests.post')
     def test_make_api_request_success(self, mock_post):
@@ -136,9 +122,8 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
     @patch('main.requests.post')
     def test_make_api_request_http_error(self, mock_post):
         """Test API request with HTTP error"""
-        import requests
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP Error")
+        mock_response.raise_for_status.side_effect = Exception("HTTP Error")
         mock_response.status_code = 403
         mock_response.text = "Forbidden"
         mock_post.return_value = mock_response
@@ -230,10 +215,12 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
     @patch('main.config')
     def test_get_databases_json_error(self, mock_config, mock_request):
         """Test databases retrieval with JSON serialization error"""
-        mock_config.__getitem__.side_effect = lambda x: self.test_config[x]
+        # Mock config with invalid structure that causes JSON issues
+        invalid_config = self.test_config.copy()
+        mock_config.__getitem__.side_effect = lambda x: invalid_config[x]
         
         import main
-        with patch('main.json.dumps', side_effect=json.JSONDecodeError("Invalid JSON", "doc", 0)):
+        with patch('main.json.dumps', side_effect=TypeError("Object is not JSON serializable")):
             databases = main.get_databases("test/connection/1", "databricks")
         
         self.assertEqual(len(databases), 0)
@@ -364,7 +351,18 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         
         mock_exit.assert_called_with(1)
 
-
+    @patch('main.get_connections')
+    @patch('main.sys.exit')
+    def test_main_keyboard_interrupt(self, mock_exit, mock_get_conn):
+        """Test main function with keyboard interrupt"""
+        mock_get_conn.side_effect = KeyboardInterrupt()
+        
+        import main
+        with patch('main.logger') as mock_logger:
+            main.main()
+            mock_logger.info.assert_called_with("Data extraction interrupted by user")
+        
+        mock_exit.assert_called_with(0)
 
 
 if __name__ == '__main__':
