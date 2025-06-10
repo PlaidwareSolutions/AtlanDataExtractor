@@ -200,6 +200,18 @@ python -m coverage report --show-missing
 python -m coverage html
 ```
 
+### Test Features
+
+The updated test suite validates:
+- **String Replacement Functionality**: Tests the new payload modification approach using string search and replace
+- Configuration loading and validation
+- Authentication token handling (environment vs config)
+- API request success and failure scenarios
+- Data extraction and processing with proper field mapping
+- CSV export functionality to output directory
+- Error handling and edge cases
+```
+
 ### Test Coverage Results
 
 The test suite achieves **98% code coverage** with 30 comprehensive test cases covering:
