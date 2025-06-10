@@ -68,15 +68,14 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         """Clean up after each test method"""
         shutil.rmtree(self.test_dir)
 
-    @patch('main.config', new_callable=lambda: {})
     @patch('main.os.getenv')
-    def test_get_auth_token_from_env(self, mock_getenv, mock_config):
+    def test_get_auth_token_from_env(self, mock_getenv):
         """Test authentication token retrieval from environment variable"""
         mock_getenv.return_value = "env_token_123"
-        mock_config.get.return_value = None
         
         import main
-        token = main.get_auth_token()
+        with patch.object(main, 'config', {'auth_token': None}):
+            token = main.get_auth_token()
         
         self.assertEqual(token, "Bearer env_token_123")
         mock_getenv.assert_called_with('ATLAN_AUTH_TOKEN')
@@ -93,16 +92,15 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         
         self.assertEqual(token, "Bearer config_token_456")
 
-    @patch('main.config')
-    @patch('main.os.getenv')
     @patch('main.sys.exit')
-    def test_get_auth_token_missing(self, mock_exit, mock_getenv, mock_config):
+    @patch('main.os.getenv')
+    def test_get_auth_token_missing(self, mock_getenv, mock_exit):
         """Test authentication token when none available"""
         mock_getenv.return_value = None
-        mock_config.get.return_value = None
         
         import main
-        main.get_auth_token()
+        with patch.object(main, 'config', {'auth_token': None}):
+            main.get_auth_token()
         
         mock_exit.assert_called_with(1)
 
@@ -231,12 +229,10 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
     @patch('main.config')
     def test_get_databases_json_error(self, mock_config, mock_request):
         """Test databases retrieval with JSON serialization error"""
-        # Mock config with invalid structure that causes JSON issues
-        invalid_config = self.test_config.copy()
-        mock_config.__getitem__.side_effect = lambda x: invalid_config[x]
+        mock_config.__getitem__.side_effect = lambda x: self.test_config[x]
         
         import main
-        with patch('main.json.dumps', side_effect=TypeError("Object is not JSON serializable")):
+        with patch('main.json.dumps', side_effect=json.JSONDecodeError("Invalid JSON", "doc", 0)):
             databases = main.get_databases("test/connection/1", "databricks")
         
         self.assertEqual(len(databases), 0)
