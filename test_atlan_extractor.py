@@ -107,6 +107,22 @@ class TestAtlanExtractorFunctions(unittest.TestCase):
         mock_exit.assert_called_with(1)
 
     @patch('main.requests.post')
+    @patch('main.logger')
+    def test_make_api_request_success_with_url_logging(self, mock_logger, mock_post):
+        """Test successful API request with URL logging"""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"success": True}
+        mock_post.return_value = mock_response
+        
+        import main
+        result = main.make_api_request("https://test.com/api", {"test": "data"})
+        
+        self.assertEqual(result, {"success": True})
+        # Verify URL is logged
+        mock_logger.info.assert_any_call("Making API request to URL: https://test.com/api")
+
+    @patch('main.requests.post')
     def test_make_api_request_success(self, mock_post):
         """Test successful API request"""
         mock_response = MagicMock()
