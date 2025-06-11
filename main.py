@@ -24,7 +24,8 @@ import requests
 import logging
 import sys
 import os
-from datetime import datetime
+import glob
+from datetime import datetime, timedelta
 
 # Create logs directory for timestamped log files if it doesn't exist
 LOGS_DIR = 'logs'
@@ -63,6 +64,52 @@ BASE_URL = config.get('base_url', '')
 if not BASE_URL:
     logger.error("Base URL not found in configuration")
     sys.exit(1)
+
+
+def cleanup_old_files():
+    """
+    Remove log files and output files older than 30 days to prevent disk space issues.
+    
+    This function automatically cleans up:
+    - Log files in logs/ directory older than 30 days
+    - CSV output files in output/ directory older than 30 days
+    """
+    cutoff_date = datetime.now() - timedelta(days=30)
+    files_deleted = 0
+    
+    # Clean up old log files
+    log_pattern = os.path.join(LOGS_DIR, 'atlan_extractor_*.log')
+    for log_file in glob.glob(log_pattern):
+        try:
+            file_time = datetime.fromtimestamp(os.path.getmtime(log_file))
+            if file_time < cutoff_date:
+                os.remove(log_file)
+                files_deleted += 1
+                logger.info(f"Deleted old log file: {log_file}")
+        except OSError as e:
+            logger.warning(f"Could not delete log file {log_file}: {e}")
+    
+    # Clean up old output files
+    output_patterns = [
+        os.path.join(OUTPUT_DIR, 'connections_*.csv'),
+        os.path.join(OUTPUT_DIR, 'databases_*.csv')
+    ]
+    
+    for pattern in output_patterns:
+        for output_file in glob.glob(pattern):
+            try:
+                file_time = datetime.fromtimestamp(os.path.getmtime(output_file))
+                if file_time < cutoff_date:
+                    os.remove(output_file)
+                    files_deleted += 1
+                    logger.info(f"Deleted old output file: {output_file}")
+            except OSError as e:
+                logger.warning(f"Could not delete output file {output_file}: {e}")
+    
+    if files_deleted > 0:
+        logger.info(f"Cleanup completed: {files_deleted} old files removed")
+    else:
+        logger.info("Cleanup completed: No old files found to remove")
 
 
 def get_auth_token():
@@ -288,13 +335,13 @@ def get_databases(connection_qualified_name, connector_name):
     return databases
 
 
-def export_connections_to_csv(connections, filename='connections.csv'):
+def export_connections_to_csv(connections, filename=None):
     """
     Export connections data to CSV file with proper formatting and error handling.
     
     Args:
         connections (list): List of connection dictionaries to export
-        filename (str): Output CSV filename (default: 'connections.csv')
+        filename (str): Output CSV filename (default: timestamped connections file)
         
     Returns:
         None: Function writes to file and logs results
@@ -306,6 +353,10 @@ def export_connections_to_csv(connections, filename='connections.csv'):
     if not connections:
         logger.warning("No connections data to export")
         return
+
+    # Generate timestamped filename if not provided
+    if filename is None:
+        filename = f'connections_{timestamp}.csv'
 
     logger.info(f"Exporting {len(connections)} connections to {filename}")
 
@@ -329,13 +380,13 @@ def export_connections_to_csv(connections, filename='connections.csv'):
         logger.error(f"Failed to write connections CSV file: {e}")
 
 
-def export_databases_to_csv(databases, filename='databases.csv'):
+def export_databases_to_csv(databases, filename=None):
     """
     Export databases data to CSV file with proper formatting and error handling.
     
     Args:
         databases (list): List of database dictionaries to export
-        filename (str): Output CSV filename (default: 'databases.csv')
+        filename (str): Output CSV filename (default: timestamped databases file)
         
     Returns:
         None: Function writes to file and logs results
@@ -347,6 +398,10 @@ def export_databases_to_csv(databases, filename='databases.csv'):
     if not databases:
         logger.warning("No databases data to export")
         return
+
+    # Generate timestamped filename if not provided
+    if filename is None:
+        filename = f'databases_{timestamp}.csv'
 
     logger.info(f"Exporting {len(databases)} databases to {filename}")
 
@@ -375,16 +430,20 @@ def main():
     Main execution function that orchestrates the complete data extraction workflow.
     
     Workflow steps:
-    1. Fetch all connections from Atlan connections API
-    2. Export connections data to CSV file
-    3. For each connection, fetch associated databases
-    4. Export all databases data to CSV file
-    5. Log completion summary
+    1. Clean up old files (logs and outputs older than 30 days)
+    2. Fetch all connections from Atlan connections API
+    3. Export connections data to timestamped CSV file
+    4. For each connection, fetch associated databases
+    5. Export all databases data to timestamped CSV file
+    6. Log completion summary
     
     Raises:
         SystemExit: If no connections are found or critical errors occur
     """
     logger.info("Starting Atlan data extraction process")
+    
+    # Step 1: Clean up old files
+    cleanup_old_files()
 
     # Step 1: Fetch connections from Atlan API
     connections = get_connections()

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Unit tests for Atlan Data Extractor - Simple Working Version
+Unit tests for Atlan Data Extractor - Updated Version
 
 This module contains working test cases that properly mock all dependencies
-and test the core functionality without external calls.
+and test the core functionality including timestamped files, base URL configuration,
+and file cleanup functionality.
 """
 
 import unittest
@@ -13,7 +14,9 @@ import os
 import tempfile
 import shutil
 import sys
+import glob
 from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
 
 
 class TestAtlanExtractorSimple(unittest.TestCase):
