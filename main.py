@@ -136,14 +136,14 @@ def make_api_request(endpoint_path, payload):
         return response.json()
     except requests.exceptions.RequestException as e:
         # Handle network, timeout, and HTTP errors
-        logger.error(f"API request failed for {url}: {e}")
+        logger.error(f"API request failed for {full_url}: {e}")
         if response is not None:
             logger.error(f"Response status: {response.status_code}")
             logger.error(f"Response content: {response.text}")
         return None
     except json.JSONDecodeError as e:
         # Handle invalid JSON response
-        logger.error(f"Failed to parse JSON response from {url}: {e}")
+        logger.error(f"Failed to parse JSON response from {full_url}: {e}")
         if response is not None:
             logger.error(f"Response content: {response.text}")
         return None

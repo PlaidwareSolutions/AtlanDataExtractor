@@ -22,14 +22,15 @@ class TestAtlanExtractorSimple(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.test_config = {
+            "base_url": "https://test-company.atlan.com",
             "auth_token": "test_token_12345",
             "connections_api": {
-                "url": "https://test-company.atlan.com/api/getConnections",
+                "url": "/api/getConnections",
                 "payload": {"dsl": {"size": 400}}
             },
             "api_map": {"databricks": "databases_api"},
             "databases_api": {
-                "url": "https://test-company.atlan.com/api/getDatabases",
+                "url": "/api/getDatabases",
                 "payload": {
                     "dsl": {
                         "query": {
@@ -296,13 +297,16 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         self.assertEqual(valid_connections[0]['connection_name'], 'valid-connection')
 
     def test_url_logging_format(self):
-        """Test URL logging format"""
-        test_url = "https://test-company.atlan.com/api/getConnections"
-        expected_log_message = f"Making API request to URL: {test_url}"
+        """Test URL logging format with base URL combination"""
+        base_url = "https://test-company.atlan.com"
+        endpoint_path = "/api/getConnections"
+        expected_full_url = f"{base_url.rstrip('/')}{endpoint_path}"
+        expected_log_message = f"Making API request to URL: {expected_full_url}"
         
-        # This tests the format of the logging message
+        # This tests the format of the logging message and URL combination
         self.assertIn("Making API request to URL:", expected_log_message)
-        self.assertIn(test_url, expected_log_message)
+        self.assertIn(expected_full_url, expected_log_message)
+        self.assertEqual(expected_full_url, "https://test-company.atlan.com/api/getConnections")
 
     def test_output_directory_creation(self):
         """Test output directory creation logic"""
