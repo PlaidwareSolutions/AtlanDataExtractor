@@ -71,18 +71,12 @@ if not SUBDOMAIN_AUTH_MAP:
     print("ERROR: Subdomain authentication mapping not found in configuration")
     sys.exit(1)
 
-# Generate prefixed log filename
-log_filename = os.path.join(LOGS_DIR, f'{SUBDOMAIN_PREFIX}.atlan_extractor_{timestamp}.log')
-
-# Configure logging to both file and console for comprehensive monitoring
-# Log level INFO provides detailed execution flow without debug verbosity
+# Configure console logging (file logging will be added per subdomain)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_filename),  # Prefixed timestamped log file in logs directory
-        logging.StreamHandler(sys.stdout)  # Real-time console output
-    ])
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +86,8 @@ if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
     logger.info(f"Created output directory: {OUTPUT_DIR}")
 
-logger.info(f"Using subdomain prefix: {SUBDOMAIN_PREFIX}")
+logger.info("Starting multi-subdomain Atlan data extraction process")
+logger.info(f"Found {len(SUBDOMAIN_AUTH_MAP)} subdomains to process: {list(SUBDOMAIN_AUTH_MAP.keys())}")
 
 
 def cleanup_old_files():
@@ -150,40 +145,46 @@ def cleanup_old_files():
         logger.info("Cleanup completed: No old files found to remove")
 
 
-def get_auth_token():
+def get_auth_token(subdomain):
     """
-    Retrieve authentication token from environment variable or config file.
+    Retrieve authentication token for a specific subdomain.
     
     Priority order:
-    1. ATLAN_AUTH_TOKEN environment variable (recommended for security)
-    2. auth_token field from config.json file
+    1. ATLAN_AUTH_TOKEN environment variable (for backward compatibility)
+    2. subdomain-specific token from subdomain_auth_token_map
+    3. auth_token field from config.json file (backward compatibility)
     
-    Returns:
-        str: Bearer token formatted for API authentication
+    Args:
+        subdomain (str): The subdomain to get authentication for
         
-    Raises:
-        SystemExit: If no token is found in either location
+    Returns:
+        str: Bearer token formatted for API authentication, or None if not found
     """
-    # Check environment variable first (more secure)
+    # Check environment variable first (backward compatibility)
     token = os.getenv('ATLAN_AUTH_TOKEN')
-    if not token:
-        # Fallback to config file
-        token = config.get('auth_token', '')
+    if token:
+        logger.info(f"Using authentication token from environment variable for subdomain: {subdomain}")
+        return f"Bearer {token}" if not token.lower().startswith('bearer ') else token
+    
+    # Check subdomain-specific token mapping
+    token = SUBDOMAIN_AUTH_MAP.get(subdomain)
+    if token:
+        logger.info(f"Using authentication token from subdomain mapping for: {subdomain}")
+        return f"Bearer {token}" if not token.lower().startswith('bearer ') else token
+    
+    # Fallback to config file (backward compatibility)
+    token = config.get('auth_token', '')
+    if token:
+        logger.info(f"Using authentication token from config file for subdomain: {subdomain}")
+        return f"Bearer {token}" if not token.lower().startswith('bearer ') else token
 
-    # Validate token exists
-    if not token:
-        logger.error(
-            "No authentication token found. Please set ATLAN_AUTH_TOKEN environment variable or add auth_token to config.json"
-        )
-        sys.exit(1)
-
-    # Ensure proper Bearer format
-    if token.lower().startswith('bearer '):
-        return token
-    return f'Bearer {token}'
+    # No token found for this subdomain
+    logger.error(f"No authentication token found for subdomain: {subdomain}")
+    return None
 
 
-def make_api_request(endpoint_path, payload):
+
+def make_api_request(endpoint_path, payload, base_url, auth_token):
     """
     Make HTTP POST request to Atlan API with authentication and error handling.
     
@@ -198,11 +199,11 @@ def make_api_request(endpoint_path, payload):
         None: All exceptions are caught and logged
     """
     # Combine base URL with endpoint path to create full URL
-    full_url = f"{BASE_URL.rstrip('/')}{endpoint_path}"
+    full_url = f"{base_url.rstrip('/')}{endpoint_path}"
     
     # Prepare headers with authentication and content type
     headers = {
-        'Authorization': get_auth_token(),
+        'Authorization': auth_token,
         'Content-Type': 'application/json'
     }
 
