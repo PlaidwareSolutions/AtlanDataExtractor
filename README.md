@@ -1,37 +1,35 @@
 # Atlan Data Extractor
 
-A Python script that extracts connections and databases data from Atlan APIs and exports the data to CSV files.
+A robust Python utility for extracting and exporting connection and database metadata from Atlan APIs, designed for enterprise network environments with advanced security and error management capabilities.
 
 ## Features
 
-- Extract connection data from Atlan's GET CONNECTIONS API
-- Export connections to timestamped CSV files (e.g., `connections_2025-06-11-01-02-40.csv`)
-- Iteratively fetch database data for each connection using GET DATABASES API
-- Export databases to timestamped CSV files (e.g., `databases_2025-06-11-01-02-40.csv`)
-- Create combined CSV file joining connections and databases (e.g., `connections-databases_2025-06-11-01-02-40.csv`)
-- Left join logic ensures all connections appear even without matching databases
-- Timestamped logging with files in logs/ directory (e.g., `atlan_extractor_2025-06-11-01-02-40.log`)
-- Automatic cleanup of files older than 30 days to prevent disk space issues
-- Base URL configuration to eliminate URL repetition in config files
-- Robust error handling and comprehensive logging
-- Configurable API endpoints and request payloads
-- Support for Bearer token authentication
-- Comprehensive unit tests with full feature coverage
+- **Subdomain-Prefixed File Generation**: All generated files include subdomain prefix extracted from base URL (e.g., `company.connections_2025-06-11-15-30-45.csv`)
+- **Base URL Configuration**: Centralized URL management eliminates repetition across API endpoints
+- **Sequential API Extraction**: Extract connection data from Atlan's GET CONNECTIONS API, then fetch databases for each connection
+- **Timestamped Output Files**: All CSV files include timestamps for version tracking and historical data management
+- **Combined Dataset Creation**: Creates merged CSV with left join logic ensuring all connections appear even without matching databases
+- **Automated File Management**: 30-day automatic cleanup of old log and output files to prevent disk space issues
+- **Comprehensive Logging**: Timestamped logs with subdomain prefix in dedicated logs/ directory
+- **Flexible Authentication**: Support for environment variable or config-based Bearer token authentication
+- **Multi-Connector Support**: Handles various connector types (databricks, snowflake, oracle, tableau, etc.) with dedicated API configurations
+- **Robust Error Handling**: Comprehensive exception handling with detailed logging and graceful failure recovery
+- **Production-Ready Testing**: 15 comprehensive unit tests covering all functionality including edge cases
 
 ## Project Structure
 
 ```
 atlan-data-extractor/
-├── main.py                          # Main extractor script
+├── main.py                          # Main extractor script with subdomain prefix functionality
 ├── configs/                         # Configuration directory
-│   └── config.json                 # Configuration file with base URL and API endpoints
-├── logs/                           # Timestamped log files directory
-│   └── atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
-├── output/                         # Timestamped CSV output files directory
-│   ├── connections_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── databases_YYYY-MM-DD-HH-MM-SS.csv
-│   └── connections-databases_YYYY-MM-DD-HH-MM-SS.csv
-├── test_atlan_extractor.py        # Comprehensive unit tests (14 test cases)
+│   └── config.json                 # Base URL and API endpoints configuration
+├── logs/                           # Timestamped log files with subdomain prefix
+│   └── subdomain.atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
+├── output/                         # Timestamped CSV output files with subdomain prefix
+│   ├── subdomain.connections_YYYY-MM-DD-HH-MM-SS.csv
+│   ├── subdomain.databases_YYYY-MM-DD-HH-MM-SS.csv
+│   └── subdomain.connections-databases_YYYY-MM-DD-HH-MM-SS.csv
+├── test_atlan_extractor.py        # Comprehensive unit tests (15 test cases)
 ├── project_requirements.txt       # Project dependencies
 ├── .gitignore                     # Git ignore file
 └── README.md                      # This file
@@ -84,14 +82,16 @@ Add your token to the `configs/config.json` file:
 }
 ```
 
-### API Endpoints Configuration
+### Base URL and API Configuration
 
 Update the `configs/config.json` file with your Atlan instance details:
 
 ```json
 {
+  "base_url": "https://your-company.atlan.com",
+  "auth_token": "your_actual_bearer_token_here",
   "connections_api": {
-    "url": "https://your-company.atlan.com/api/meta/search/indexsearch",
+    "url": "/api/getConnections",
     "payload": {
       "dsl": {
         "size": 400,
@@ -101,11 +101,21 @@ Update the `configs/config.json` file with your Atlan instance details:
         "aggs": {}
       },
       "attributes": ["connectorName", "isPartial"],
-      "suppressLogs": true
+      "suppressLogs": true,
+      "requestMetadata": {
+        "utmTags": ["page_glossary", "project_webapp", "action_bootstrap", "action_fetch_connections"]
+      }
     }
   },
+  "api_map": {
+    "databricks": "databases_api",
+    "snowflake": "databases_api",
+    "oracle": "databases_api",
+    "tableau": "tableau_api",
+    "alteryx": "alteryx_api"
+  },
   "databases_api": {
-    "url": "https://your-company.atlan.com/api/meta/search/indexsearch",
+    "url": "/api/getDatabases",
     "payload": {
       "dsl": {
         "sort": [{"name.keyword": {"order": "asc"}}],
@@ -131,6 +141,11 @@ Update the `configs/config.json` file with your Atlan instance details:
 }
 ```
 
+**Key Configuration Elements:**
+- `base_url`: Your Atlan instance URL (subdomain automatically extracted for file prefixes)
+- `api_map`: Maps connector types to their corresponding API configurations
+- `PLACEHOLDER_TO_BE_REPLACED`: Automatically replaced with connection qualified names during execution
+
 ## Usage
 
 ### Running the Data Extractor
@@ -152,37 +167,51 @@ ATLAN_AUTH_TOKEN="your_token" python main.py
 
 ### Expected Output
 
-The script will generate two CSV files in the `output/` directory:
+The script generates three timestamped CSV files with subdomain prefixes in the `output/` directory:
 
-**output/connections.csv** - Contains connection data with columns:
-- connection_name
-- connection_qualified_name
+**subdomain.connections_YYYY-MM-DD-HH-MM-SS.csv** - Contains connection data with columns:
+- name (connection display name)
+- connection_qualified_name (unique identifier)
+- connector_name (e.g., databricks, snowflake)
+- updated_by
+- created_by
+- create_time
+- update_time
+
+**subdomain.databases_YYYY-MM-DD-HH-MM-SS.csv** - Contains database data with columns:
+- connection_qualified_name (parent connection)
+- type_name (entity type, typically "Database")
+- qualified_name (unique database identifier)
+- name (database display name)
+- created_by
+- updated_by
+- create_time
+- update_time
+
+**subdomain.connections-databases_YYYY-MM-DD-HH-MM-SS.csv** - Combined dataset using left join:
 - connector_name
+- connection_name
 - category
-- created_by
-- updated_by
-- create_time
-- update_time
-
-**output/databases.csv** - Contains database data with columns:
 - type_name
-- qualified_name
-- name
-- created_by
-- updated_by
-- create_time
-- update_time
-- connection_qualified_name
+- name (database name, empty if no databases found)
+
+Example filenames:
+- `company.connections_2025-06-11-15-30-45.csv`
+- `company.databases_2025-06-11-15-30-45.csv`
+- `company.connections-databases_2025-06-11-15-30-45.csv`
 
 ### Execution Flow
 
-1. **Load Configuration**: Reads API endpoints and authentication from configs/config.json
-2. **Create Output Directory**: Creates `output/` directory if it doesn't exist
-3. **Fetch Connections**: Makes POST request to connections API (URL logged)
-4. **Export Connections**: Saves connection data to output/connections.csv
-5. **Fetch Databases**: For each connection, fetches associated databases (URLs logged)
-6. **Export Databases**: Saves all database data to output/databases.csv
-7. **Logging**: All operations, including API URLs, are logged to console and atlan_extractor.log
+1. **Extract Subdomain**: Extracts subdomain from base_url for file prefixing
+2. **Load Configuration**: Reads base URL and API endpoints from configs/config.json
+3. **File Cleanup**: Automatically removes log and output files older than 30 days
+4. **Fetch Connections**: Makes POST request to connections API using base_url + endpoint
+5. **Export Connections**: Saves to subdomain.connections_timestamp.csv in output/ directory
+6. **Process Each Connection**: For each connection, determines appropriate API using api_map
+7. **Fetch Databases**: Makes POST requests with connection-specific payload replacement
+8. **Export Databases**: Saves to subdomain.databases_timestamp.csv
+9. **Create Combined File**: Generates left-joined dataset as subdomain.connections-databases_timestamp.csv
+10. **Logging**: All operations logged to subdomain.atlan_extractor_timestamp.log in logs/ directory
 
 ## Testing
 
@@ -212,21 +241,21 @@ python -m coverage html
 ### Test Features
 
 The updated test suite validates:
-- **String Replacement Functionality**: Tests the new payload modification approach using string search and replace
-- **Configs Directory Structure**: Tests the new configs/ directory for configuration files
-- **URL Logging**: Validates that API URLs are properly logged during requests
-- **Output Directory**: Tests CSV export functionality to output/ directory
-- **Combined CSV Left Join**: Tests the joining of connections and databases with left join logic
-- **Timestamped Filenames**: Tests generation of timestamped log and CSV files
-- **File Cleanup**: Tests automatic deletion of files older than 30 days
-- **Base URL Configuration**: Tests proper URL combination from base URL and endpoints
-- Authentication token handling (environment vs config)
-- JSON processing and data extraction
-- Error handling and edge cases
+- **Subdomain Prefix Functionality**: Tests extraction of subdomain from URLs and file prefix generation
+- **String Replacement Functionality**: Tests payload modification using PLACEHOLDER_TO_BE_REPLACED approach
+- **Base URL Configuration**: Tests proper URL combination from centralized base URL and endpoints
+- **Timestamped Filenames**: Tests generation of timestamped log and CSV files with subdomain prefixes
+- **Combined CSV Left Join**: Tests joining of connections and databases ensuring all connections appear
+- **File Cleanup**: Tests automatic deletion of files older than 30 days from logs/ and output/ directories
+- **Multi-Connector Support**: Tests API mapping for different connector types (databricks, tableau, etc.)
+- **Authentication Handling**: Tests environment variable vs config file token priority
+- **Error Handling**: Tests network failures, invalid responses, and edge cases
+- **CSV Export Operations**: Tests individual and combined file creation with proper column ordering
+- **Directory Management**: Tests automatic creation of logs/ and output/ directories
 
 ### Test Coverage Results
 
-The test suite achieves comprehensive coverage with 14 focused test cases covering:
+The test suite achieves comprehensive coverage with 15 focused test cases covering:
 
 - **Configuration Management**: Valid/invalid config files, authentication methods
 - **API Request Handling**: Success scenarios, HTTP errors, network failures, JSON parsing
@@ -271,28 +300,49 @@ python -m unittest test_atlan_extractor.TestMainFunction
 
 ### Logging
 
-The script generates detailed logs in:
+The script generates detailed logs with subdomain prefixes in:
 - **Console output**: Real-time progress and status updates
-- **atlan_extractor.log**: Complete execution log with timestamps
+- **logs/subdomain.atlan_extractor_timestamp.log**: Complete execution log with timestamps
 
 Log levels include:
-- INFO: Normal operation progress
-- WARNING: Non-critical issues (empty data, API retries)
-- ERROR: Critical errors requiring attention
+- INFO: Normal operation progress (URL requests, file operations, subdomain extraction)
+- WARNING: Non-critical issues (empty data, cleanup operations)
+- ERROR: Critical errors requiring attention (authentication failures, network issues)
+
+Example log entries:
+```
+2025-06-11 15:30:45,123 - INFO - Using subdomain prefix: company
+2025-06-11 15:30:45,124 - INFO - Making API request to URL: https://company.atlan.com/api/getConnections
+2025-06-11 15:30:46,456 - INFO - Exporting 25 connections to company.connections_2025-06-11-15-30-45.csv
+```
 
 ## Data Output Format
 
-### Connections CSV Structure (output/connections.csv)
+### Connections CSV Structure (subdomain.connections_timestamp.csv)
 ```csv
-connection_name,connection_qualified_name,connector_name,category,created_by,updated_by,create_time,update_time
-odessa-dev,default/databricks/123,databricks,lake,user@company.com,user@company.com,1748635725374,1748635725374
+name,connection_qualified_name,connector_name,updated_by,created_by,create_time,update_time
+odessa-dev,default/databricks/123,databricks,user@company.com,user@company.com,1748635725374,1748635725374
+snowflake-prod,default/snowflake/456,snowflake,admin@company.com,admin@company.com,1748635725374,1748635725374
 ```
 
-### Databases CSV Structure (output/databases.csv)
+### Databases CSV Structure (subdomain.databases_timestamp.csv)
 ```csv
-type_name,qualified_name,name,created_by,updated_by,create_time,update_time,connection_qualified_name
-Database,default/databricks/123/db1,db1,user@company.com,user@company.com,1745543118290,1748449415976,default/databricks/123
+connection_qualified_name,type_name,qualified_name,name,created_by,updated_by,create_time,update_time
+default/databricks/123,Database,default/databricks/123/db1,db1,user@company.com,user@company.com,1745543118290,1748449415976
+default/databricks/123,Database,default/databricks/123/db2,db2,user@company.com,user@company.com,1745543118290,1748449415976
+default/snowflake/456,Database,default/snowflake/456/analytics,analytics,admin@company.com,admin@company.com,1745543118290,1748449415976
 ```
+
+### Combined CSV Structure (subdomain.connections-databases_timestamp.csv)
+```csv
+connector_name,connection_name,category,type_name,name
+databricks,odessa-dev,lake,Database,db1
+databricks,odessa-dev,lake,Database,db2
+snowflake,snowflake-prod,warehouse,Database,analytics
+tableau,tableau-server,visualization,,
+```
+
+**Note**: The combined CSV uses left join logic - connections without databases show empty database fields but are still included.
 
 ## Security Considerations
 

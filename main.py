@@ -52,12 +52,24 @@ def extract_subdomain(url):
     except Exception:
         return 'atlan'
 
-BASE_URL = config.get('base_url', '')
-if not BASE_URL:
-    print("ERROR: Base URL not found in configuration")
+# Get base URL template and subdomain mapping for multi-subdomain support
+BASE_URL_TEMPLATE = config.get('base_url_template', '')
+SUBDOMAIN_AUTH_MAP = config.get('subdomain_auth_token_map', {})
+
+# Backward compatibility: check for single subdomain configuration
+if not BASE_URL_TEMPLATE and config.get('base_url'):
+    BASE_URL = config.get('base_url')
+    SUBDOMAIN_PREFIX = extract_subdomain(BASE_URL)
+    SUBDOMAIN_AUTH_MAP = {SUBDOMAIN_PREFIX: config.get('auth_token', '')}
+    BASE_URL_TEMPLATE = BASE_URL.replace(SUBDOMAIN_PREFIX, '{subdomain}')
+
+if not BASE_URL_TEMPLATE:
+    print("ERROR: Base URL template not found in configuration")
     sys.exit(1)
 
-SUBDOMAIN_PREFIX = extract_subdomain(BASE_URL)
+if not SUBDOMAIN_AUTH_MAP:
+    print("ERROR: Subdomain authentication mapping not found in configuration")
+    sys.exit(1)
 
 # Generate prefixed log filename
 log_filename = os.path.join(LOGS_DIR, f'{SUBDOMAIN_PREFIX}.atlan_extractor_{timestamp}.log')
