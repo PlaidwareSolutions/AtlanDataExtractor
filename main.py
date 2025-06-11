@@ -1,89 +1,100 @@
 #!/usr/bin/env python3
 """
-Atlan Data Extractor - Multi-Subdomain Version
+Atlan Data Extractor
 
-This script extracts connections and databases data from multiple Atlan subdomains
-and exports the data to CSV files with subdomain prefixes.
+This script extracts connections and databases data from Atlan APIs
+and exports the data to CSV files.
 
 The script performs the following operations:
-1. Loads configuration from config.json file with subdomain_auth_token_map
-2. Processes each subdomain with its specific authentication token
-3. Fetches connections data from each Atlan subdomain
-4. Exports connections data to subdomain.connections_timestamp.csv
+1. Loads configuration from config.json file
+2. Authenticates using Bearer token (from environment variable or config)
+3. Fetches connections data from Atlan connections API
+4. Exports connections data to connections.csv
 5. For each connection, fetches associated databases
-6. Exports all databases data to subdomain.databases_timestamp.csv
-7. Creates combined CSV with subdomain column as first field
+6. Exports all databases data to databases.csv
 
-Author: Enhanced for multi-subdomain support
-Version: 2.0
+Author: Nawaz Mohammad (U787320)
+Version: 1.0
 Dependencies: requests, json, csv, logging, sys, os
 """
 
-import requests
 import json
 import csv
+import requests
 import logging
 import sys
 import os
 import glob
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
+
+# Create logs directory for timestamped log files if it doesn't exist
+LOGS_DIR = 'logs'
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
 
 # Generate timestamp for all files
 timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
-# Create directories if they don't exist
-LOGS_DIR = 'logs'
-OUTPUT_DIR = 'output'
-
-for directory in [LOGS_DIR, OUTPUT_DIR]:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-# Load configuration from JSON file
+# Load configuration first to get base URL
 with open('configs/config.json', 'r') as f:
     config = json.load(f)
 
-# Get base URL template and subdomain mapping for multi-subdomain support
-BASE_URL_TEMPLATE = config.get('base_url_template', '')
-SUBDOMAIN_AUTH_MAP = config.get('subdomain_auth_token_map', {})
+# Extract subdomain from base URL for file prefixes
+def extract_subdomain(url):
+    """Extract subdomain from URL for use as file prefix"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ''
+        # Extract first part before .atlan.com or similar
+        parts = hostname.split('.')
+        return parts[0] if parts and len(parts) > 0 and parts[0] else 'atlan'
+    except Exception:
+        return 'atlan'
 
-# Backward compatibility: check for single subdomain configuration
-if not BASE_URL_TEMPLATE and config.get('base_url'):
-    BASE_URL = config.get('base_url')
-    subdomain = urlparse(BASE_URL).hostname.split('.')[0] if urlparse(BASE_URL).hostname else 'atlan'
-    SUBDOMAIN_AUTH_MAP = {subdomain: config.get('auth_token', '')}
-    BASE_URL_TEMPLATE = BASE_URL.replace(subdomain, '{subdomain}')
-
-if not BASE_URL_TEMPLATE:
-    print("ERROR: Base URL template not found in configuration")
+BASE_URL = config.get('base_url', '')
+if not BASE_URL:
+    print("ERROR: Base URL not found in configuration")
     sys.exit(1)
 
-if not SUBDOMAIN_AUTH_MAP:
-    print("ERROR: Subdomain authentication mapping not found in configuration")
-    sys.exit(1)
+SUBDOMAIN_PREFIX = extract_subdomain(BASE_URL)
 
-# Configure console logging
+# Generate prefixed log filename
+log_filename = os.path.join(LOGS_DIR, f'{SUBDOMAIN_PREFIX}.atlan_extractor_{timestamp}.log')
+
+# Configure logging to both file and console for comprehensive monitoring
+# Log level INFO provides detailed execution flow without debug verbosity
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+    handlers=[
+        logging.FileHandler(log_filename),  # Prefixed timestamped log file in logs directory
+        logging.StreamHandler(sys.stdout)  # Real-time console output
+    ])
 
 logger = logging.getLogger(__name__)
 
-logger.info("Starting multi-subdomain Atlan data extraction process")
-logger.info(f"Found {len(SUBDOMAIN_AUTH_MAP)} subdomains to process: {list(SUBDOMAIN_AUTH_MAP.keys())}")
+# Create output directory for CSV files if it doesn't exist
+OUTPUT_DIR = 'output'
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+    logger.info(f"Created output directory: {OUTPUT_DIR}")
+
+logger.info(f"Using subdomain prefix: {SUBDOMAIN_PREFIX}")
 
 
 def cleanup_old_files():
     """
     Remove log files and output files older than 30 days to prevent disk space issues.
-    """
-    files_deleted = 0
-    cutoff_date = datetime.now() - timedelta(days=30)
     
-    # Clean up old log files (both prefixed and non-prefixed)
+    This function automatically cleans up:
+    - Log files in logs/ directory older than 30 days
+    - CSV output files in output/ directory older than 30 days
+    """
+    cutoff_date = datetime.now() - timedelta(days=30)
+    files_deleted = 0
+    
+    # Clean up old log files (both prefixed and non-prefixed for backward compatibility)
     log_patterns = [
         os.path.join(LOGS_DIR, 'atlan_extractor_*.log'),
         os.path.join(LOGS_DIR, '*.atlan_extractor_*.log')
@@ -100,7 +111,7 @@ def cleanup_old_files():
             except OSError as e:
                 logger.warning(f"Could not delete log file {log_file}: {e}")
     
-    # Clean up old output files (both prefixed and non-prefixed)
+    # Clean up old output files (both prefixed and non-prefixed for backward compatibility)
     output_patterns = [
         os.path.join(OUTPUT_DIR, 'connections_*.csv'),
         os.path.join(OUTPUT_DIR, 'databases_*.csv'),
@@ -122,408 +133,476 @@ def cleanup_old_files():
                 logger.warning(f"Could not delete output file {output_file}: {e}")
     
     if files_deleted > 0:
-        logger.info(f"Cleanup completed: Deleted {files_deleted} old files")
+        logger.info(f"Cleanup completed: {files_deleted} old files removed")
     else:
         logger.info("Cleanup completed: No old files found to remove")
 
 
-def make_api_request(endpoint_path, payload, base_url, auth_token, subdomain_logger):
+def get_auth_token():
+    """
+    Retrieve authentication token from environment variable or config file.
+    
+    Priority order:
+    1. ATLAN_AUTH_TOKEN environment variable (recommended for security)
+    2. auth_token field from config.json file
+    
+    Returns:
+        str: Bearer token formatted for API authentication
+        
+    Raises:
+        SystemExit: If no token is found in either location
+    """
+    # Check environment variable first (more secure)
+    token = os.getenv('ATLAN_AUTH_TOKEN')
+    if not token:
+        # Fallback to config file
+        token = config.get('auth_token', '')
+
+    # Validate token exists
+    if not token:
+        logger.error(
+            "No authentication token found. Please set ATLAN_AUTH_TOKEN environment variable or add auth_token to config.json"
+        )
+        sys.exit(1)
+
+    # Ensure proper Bearer format
+    if token.lower().startswith('bearer '):
+        return token
+    return f'Bearer {token}'
+
+
+def make_api_request(endpoint_path, payload):
     """
     Make HTTP POST request to Atlan API with authentication and error handling.
     
     Args:
         endpoint_path (str): API endpoint path (relative to base URL)
         payload (dict): JSON payload for the POST request
-        base_url (str): Base URL for the subdomain
-        auth_token (str): Bearer token for authentication
-        subdomain_logger: Logger instance for this subdomain
         
     Returns:
         dict or None: JSON response from API, None if request fails
+        
+    Raises:
+        None: All exceptions are caught and logged
     """
-    # Combine base URL with endpoint path
-    url = f"{base_url.rstrip('/')}{endpoint_path}"
-    subdomain_logger.info(f"Making API request to URL: {url}")
-
-    # Prepare headers
+    # Combine base URL with endpoint path to create full URL
+    full_url = f"{BASE_URL.rstrip('/')}{endpoint_path}"
+    
+    # Prepare headers with authentication and content type
     headers = {
-        'Authorization': auth_token,
+        'Authorization': get_auth_token(),
         'Content-Type': 'application/json'
     }
 
+    response = None  # Initialize response variable for proper scope
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        # Log the URL being used for the API request
+        logger.info(f"Making API request to URL: {full_url}")
+        
+        # Make POST request with timeout to prevent hanging
+        response = requests.post(full_url,
+                                 headers=headers,
+                                 data=json.dumps(payload),
+                                 timeout=30)
+        # Raise exception for HTTP error status codes (4xx, 5xx)
         response.raise_for_status()
-        
         return response.json()
-        
     except requests.exceptions.RequestException as e:
-        subdomain_logger.error(f"API request failed for {url}: {e}")
+        # Handle network, timeout, and HTTP errors
+        logger.error(f"API request failed for {full_url}: {e}")
+        if response is not None:
+            logger.error(f"Response status: {response.status_code}")
+            logger.error(f"Response content: {response.text}")
         return None
     except json.JSONDecodeError as e:
-        subdomain_logger.error(f"Failed to parse JSON response from {url}: {e}")
-        return None
-    except Exception as e:
-        subdomain_logger.error(f"Unexpected error during API request to {url}: {e}")
+        # Handle invalid JSON response
+        logger.error(f"Failed to parse JSON response from {full_url}: {e}")
+        if response is not None:
+            logger.error(f"Response content: {response.text}")
         return None
 
 
-def get_connections(subdomain, base_url, auth_token, subdomain_logger):
+def get_connections():
     """
-    Fetch connections data from Atlan connections API for a specific subdomain.
+    Fetch connections data from Atlan connections API.
+    
+    Makes a POST request to the connections endpoint configured in config.json
+    and extracts relevant connection metadata from the response.
     
     Returns:
-        list: List of dictionaries containing connection data
+        list: List of dictionaries containing connection data with keys:
+              - name: Connection display name
+              - connection_qualified_name: Unique identifier for the connection
+              - connector_name: Type of connector (e.g., databricks, snowflake)
+              - updated_by: User who last updated the connection
+              - created_by: User who created the connection
+              - create_time: Timestamp when connection was created
+              - update_time: Timestamp when connection was last updated
     """
-    connections_config = config.get('connections_api', {})
-    endpoint = connections_config.get('url', '/api/getConnections')
-    payload = connections_config.get('payload', {})
-    
-    subdomain_logger.info(f"Fetching connections for subdomain: {subdomain}")
-    
-    response_data = make_api_request(endpoint, payload, base_url, auth_token, subdomain_logger)
-    
-    if not response_data:
-        subdomain_logger.warning(f"Failed to fetch connections from Atlan API for {subdomain}")
+    logger.info("Fetching connections from Atlan API")
+
+    # Get API endpoint and payload from configuration
+    url = config['connections_api']['url']
+    payload = config['connections_api']['payload'].copy()
+
+    # Make API request to fetch connections
+    response = make_api_request(url, payload)
+    if not response:
+        logger.warning("Failed to fetch connections from Atlan API")
         return []
-    
-    # Extract connection data from response
-    entities = response_data.get('entities', [])
-    
+
+    # Extract entities from response
+    entities = response.get('entities', [])
+    logger.info(f"Retrieved {len(entities)} connections from Atlan API")
+
+    # Process each connection entity
     connections = []
     for entity in entities:
-        attributes = entity.get('attributes', {})
-        connection = {
-            'name': attributes.get('name', ''),
-            'connection_qualified_name': attributes.get('qualifiedName', ''),
-            'connector_name': attributes.get('connectorName', ''),
-            'updated_by': entity.get('updatedBy', ''),
-            'created_by': entity.get('createdBy', ''),
-            'create_time': entity.get('createTime', ''),
-            'update_time': entity.get('updateTime', '')
-        }
-        connections.append(connection)
-    
-    subdomain_logger.info(f"Successfully extracted {len(connections)} connections for {subdomain}")
+        try:
+            # Extract attributes and metadata from entity
+            attributes = entity.get('attributes', {})
+            connection_data = {
+                'connection_name': attributes.get('name', ''),
+                'connection_qualified_name':
+                attributes.get('qualifiedName', ''),
+                'connector_name': attributes.get('connectorName', ''),
+                'category': attributes.get('category', ''),
+                'updated_by': entity.get('updatedBy', ''),
+                'created_by': entity.get('createdBy', ''),
+                'create_time': entity.get('createTime', ''),
+                'update_time': entity.get('updateTime', '')
+            }
+            connections.append(connection_data)
+            logger.debug(
+                f"Processed connection: {connection_data['connection_name']}")
+        except Exception as e:
+            # Log warning but continue processing other connections
+            logger.warning(f"Failed to process connection entity: {e}")
+            continue
+
     return connections
 
 
-def get_databases(connection_qualified_name, connector_name, subdomain, base_url, auth_token, subdomain_logger):
+def get_databases(connection_qualified_name, connector_name):
     """
-    Fetch databases associated with a specific connection for a subdomain.
+    Fetch databases associated with a specific connection from Atlan databases API.
     
     Args:
         connection_qualified_name (str): Unique identifier of the connection
-        connector_name (str): Type of connector (e.g., databricks, snowflake)
-        subdomain (str): Current subdomain being processed
-        base_url (str): Base URL for the subdomain
-        auth_token (str): Bearer token for authentication
-        subdomain_logger: Logger instance for this subdomain
+                                       to fetch databases for
     
     Returns:
-        list: List of dictionaries containing database data
+        list: List of dictionaries containing database data with keys:
+              - connection_qualified_name: Parent connection identifier
+              - type_name: Entity type (typically "Database")
+              - qualified_name: Unique identifier for the database
+              - name: Database display name
+              - created_by: User who created the database
+              - updated_by: User who last updated the database
+              - create_time: Timestamp when database was created
+              - update_time: Timestamp when database was last updated
     """
-    # Determine which API configuration to use based on connector type
-    api_map = config.get('api_map', {})
-    api_config_key = api_map.get(connector_name, 'databases_api')
-    
-    api_config = config.get(api_config_key, {})
-    if not api_config:
-        subdomain_logger.warning(f"No API configuration found for connector: {connector_name}")
+    logger.info(
+        f"Fetching databases for connection: {connection_qualified_name}")
+
+    # Get API endpoint and payload template from configuration
+    url = config[config["databases_api_map"][connector_name]]['url']
+    payload_template = config[config["databases_api_map"][connector_name]]['payload']
+
+    # Convert payload to JSON string and replace placeholder with actual connection qualified name
+    try:
+        payload_json_str = json.dumps(payload_template)
+        # Replace the placeholder with the actual connection qualified name
+        updated_payload_str = payload_json_str.replace("PLACEHOLDER_TO_BE_REPLACED", connection_qualified_name)
+        # Convert back to dictionary
+        payload = json.loads(updated_payload_str)
+    except json.JSONDecodeError as e:
+        logger.error(
+            f"Failed to update payload with connection qualified name using string replacement: {e}")
         return []
-    
-    endpoint = api_config.get('url', '/api/getDatabases')
-    payload = api_config.get('payload', {})
-    
-    # Replace placeholder with actual connection qualified name
-    payload_str = json.dumps(payload)
-    payload_str = payload_str.replace('PLACEHOLDER_TO_BE_REPLACED', connection_qualified_name)
-    modified_payload = json.loads(payload_str)
-    
-    response_data = make_api_request(endpoint, modified_payload, base_url, auth_token, subdomain_logger)
-    
-    if not response_data:
+
+    # Make API request to fetch databases for this connection
+    response = make_api_request(url, payload)
+    if not response:
+        logger.warning(
+            f"Failed to fetch databases for connection: {connection_qualified_name}"
+        )
         return []
-    
-    # Extract database data from response
-    entities = response_data.get('entities', [])
-    
+
+    # Extract entities from response
+    entities = response.get('entities', [])
+    logger.info(
+        f"Retrieved {len(entities)} databases for connection: {connection_qualified_name}"
+    )
+
+    # Process each database entity
     databases = []
     for entity in entities:
-        attributes = entity.get('attributes', {})
-        database = {
-            'connection_qualified_name': connection_qualified_name,
-            'type_name': entity.get('typeName', ''),
-            'qualified_name': attributes.get('qualifiedName', ''),
-            'name': attributes.get('name', ''),
-            'created_by': entity.get('createdBy', ''),
-            'updated_by': entity.get('updatedBy', ''),
-            'create_time': entity.get('createTime', ''),
-            'update_time': entity.get('updateTime', '')
-        }
-        databases.append(database)
-    
+        try:
+            # Extract attributes and metadata from entity
+            attributes = entity.get('attributes', {})
+            database_data = {
+                'connection_qualified_name': connection_qualified_name,
+                'type_name': entity.get('typeName', ''),
+                'qualified_name': attributes.get('qualifiedName', ''),
+                'name': attributes.get('name', ''),
+                'created_by': entity.get('createdBy', ''),
+                'updated_by': entity.get('updatedBy', ''),
+                'create_time': entity.get('createTime', ''),
+                'update_time': entity.get('updateTime', '')
+            }
+            databases.append(database_data)
+            logger.debug(f"Processed database: {database_data['name']}")
+        except Exception as e:
+            # Log warning but continue processing other databases
+            logger.warning(f"Failed to process database entity: {e}")
+            continue
+
     return databases
 
 
-def export_connections_to_csv(connections, subdomain, subdomain_logger):
+def export_connections_to_csv(connections, filename=None):
     """
-    Export connections data to CSV file with subdomain prefix.
-    """
-    if not connections:
-        subdomain_logger.warning("No connections data to export")
-        return
-
-    filename = f'{subdomain}.connections_{timestamp}.csv'
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    
-    subdomain_logger.info(f"Exporting {len(connections)} connections to {filename}")
-
-    fieldnames = ['name', 'connection_qualified_name', 'connector_name', 'updated_by', 'created_by', 'create_time', 'update_time']
-    
-    try:
-        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(connections)
-        
-        subdomain_logger.info(f"Successfully exported connections to {filename}")
-    
-    except Exception as e:
-        subdomain_logger.error(f"Failed to export connections to CSV: {e}")
-
-
-def export_databases_to_csv(databases, subdomain, subdomain_logger):
-    """
-    Export databases data to CSV file with subdomain prefix.
-    """
-    if not databases:
-        subdomain_logger.warning("No databases data to export")
-        return
-
-    filename = f'{subdomain}.databases_{timestamp}.csv'
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    
-    subdomain_logger.info(f"Exporting {len(databases)} databases to {filename}")
-
-    fieldnames = ['connection_qualified_name', 'type_name', 'qualified_name', 'name', 'created_by', 'updated_by', 'create_time', 'update_time']
-    
-    try:
-        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(databases)
-        
-        subdomain_logger.info(f"Successfully exported databases to {filename}")
-    
-    except Exception as e:
-        subdomain_logger.error(f"Failed to export databases to CSV: {e}")
-
-
-def create_combined_csv(connections, databases, subdomain, subdomain_logger):
-    """
-    Create a combined CSV file with subdomain as first column, using left join logic.
-    """
-    if not connections:
-        subdomain_logger.warning("No connections data available for combined file")
-        return
-
-    filename = f'{subdomain}.connections-databases_{timestamp}.csv'
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    
-    subdomain_logger.info(f"Creating combined file with {len(connections)} connections and {len(databases)} databases")
-
-    # Create a lookup dictionary for databases by connection_qualified_name
-    db_lookup = {}
-    for db in databases:
-        conn_name = db.get('connection_qualified_name', '')
-        if conn_name not in db_lookup:
-            db_lookup[conn_name] = []
-        db_lookup[conn_name].append(db)
-
-    # Define fieldnames with subdomain as first column
-    fieldnames = ['subdomain', 'connector_name', 'connection_name', 'category', 'type_name', 'name']
-    
-    try:
-        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            # Left join: include all connections even if they have no databases
-            for connection in connections:
-                connection_qualified_name = connection.get('connection_qualified_name', '')
-                connection_databases = db_lookup.get(connection_qualified_name, [])
-                
-                if connection_databases:
-                    # Write one row for each database
-                    for db in connection_databases:
-                        combined_row = {
-                            'subdomain': subdomain,
-                            'connector_name': connection.get('connector_name', ''),
-                            'connection_name': connection.get('name', ''),
-                            'category': 'lake' if connection.get('connector_name') == 'databricks' else 
-                                       'warehouse' if connection.get('connector_name') == 'snowflake' else 
-                                       'visualization' if connection.get('connector_name') == 'tableau' else '',
-                            'type_name': db.get('type_name', ''),
-                            'name': db.get('name', '')
-                        }
-                        writer.writerow(combined_row)
-                else:
-                    # Write connection row with empty database fields (left join behavior)
-                    combined_row = {
-                        'subdomain': subdomain,
-                        'connector_name': connection.get('connector_name', ''),
-                        'connection_name': connection.get('name', ''),
-                        'category': 'lake' if connection.get('connector_name') == 'databricks' else 
-                                   'warehouse' if connection.get('connector_name') == 'snowflake' else 
-                                   'visualization' if connection.get('connector_name') == 'tableau' else '',
-                        'type_name': '',
-                        'name': ''
-                    }
-                    writer.writerow(combined_row)
-        
-        subdomain_logger.info(f"Successfully created combined file: {filename}")
-    
-    except Exception as e:
-        subdomain_logger.error(f"Failed to create combined CSV: {e}")
-
-
-def process_subdomain(subdomain, auth_token):
-    """
-    Process data extraction for a single subdomain.
+    Export connections data to CSV file with proper formatting and error handling.
     
     Args:
-        subdomain (str): The subdomain to process
-        auth_token (str): Authentication token for this subdomain
+        connections (list): List of connection dictionaries to export
+        filename (str): Output CSV filename (default: timestamped connections file)
         
     Returns:
-        dict: Summary of processing results
+        None: Function writes to file and logs results
+        
+    Raises:
+        None: All exceptions are caught and logged
     """
-    # Create subdomain-specific base URL
-    base_url = BASE_URL_TEMPLATE.format(subdomain=subdomain)
-    
-    # Set up subdomain-specific logging
-    log_filename = os.path.join(LOGS_DIR, f'{subdomain}.atlan_extractor_{timestamp}.log')
-    subdomain_logger = logging.getLogger(f"atlan_extractor_{subdomain}")
-    subdomain_logger.handlers = []  # Clear any existing handlers
-    
-    # Add file handler for this subdomain
-    file_handler = logging.FileHandler(log_filename, encoding='utf-8')
-    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    subdomain_logger.addHandler(file_handler)
-    subdomain_logger.setLevel(logging.INFO)
-    
-    # Also log to console
-    subdomain_logger.addHandler(logging.StreamHandler(sys.stdout))
-    
-    subdomain_logger.info(f"Starting data extraction for subdomain: {subdomain}")
-    subdomain_logger.info(f"Using base URL: {base_url}")
-    
+    # Check if there's data to export
+    if not connections:
+        logger.warning("No connections data to export")
+        return
+
+    # Generate timestamped filename with subdomain prefix if not provided
+    if filename is None:
+        filename = f'{SUBDOMAIN_PREFIX}.connections_{timestamp}.csv'
+
+    logger.info(f"Exporting {len(connections)} connections to {filename}")
+
+    # Define CSV column headers matching the connection data structure
+    fieldnames = [
+        'connection_name', 'connection_qualified_name', 'connector_name',
+        'category', 'created_by', 'updated_by', 'create_time', 'update_time'
+    ]
+
     try:
-        # Ensure proper Bearer token format
-        if not auth_token.lower().startswith('bearer '):
-            auth_token = f"Bearer {auth_token}"
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        # Write connections data to CSV file with UTF-8 encoding
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()  # Write column headers
+            writer.writerows(connections)  # Write data rows
+            logger.info(f"Successfully exported connections to {filepath}")
+    except IOError as e:
+        # Handle file permission or disk space errors
+        logger.error(f"Failed to write connections CSV file: {e}")
+
+
+def export_databases_to_csv(databases, filename=None):
+    """
+    Export databases data to CSV file with proper formatting and error handling.
+    
+    Args:
+        databases (list): List of database dictionaries to export
+        filename (str): Output CSV filename (default: timestamped databases file)
         
-        # Fetch connections for this subdomain
-        connections = get_connections(subdomain, base_url, auth_token, subdomain_logger)
+    Returns:
+        None: Function writes to file and logs results
         
-        if not connections:
-            subdomain_logger.warning(f"No connections found for subdomain: {subdomain}")
-            return {
-                'subdomain': subdomain,
-                'connections': 0,
-                'databases': 0,
-                'status': 'no_data'
+    Raises:
+        None: All exceptions are caught and logged
+    """
+    # Check if there's data to export
+    if not databases:
+        logger.warning("No databases data to export")
+        return
+
+    # Generate timestamped filename with subdomain prefix if not provided
+    if filename is None:
+        filename = f'{SUBDOMAIN_PREFIX}.databases_{timestamp}.csv'
+
+    logger.info(f"Exporting {len(databases)} databases to {filename}")
+
+    # Define CSV column headers matching the database data structure
+    fieldnames = [
+        'type_name', 'qualified_name', 'name', 'created_by', 'updated_by',
+        'create_time', 'update_time', 'connection_qualified_name'
+    ]
+
+    try:
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        # Write databases data to CSV file with UTF-8 encoding
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()  # Write column headers
+            writer.writerows(databases)  # Write data rows
+            logger.info(f"Successfully exported databases to {filepath}")
+    except IOError as e:
+        # Handle file permission or disk space errors
+        logger.error(f"Failed to write databases CSV file: {e}")
+
+
+def create_combined_csv(connections, databases, filename=None):
+    """
+    Create a combined CSV file by joining connections and databases data.
+    
+    Performs a left join based on connection_qualified_name to ensure all 
+    connections appear in the result even when there are no matching databases.
+    
+    Args:
+        connections (list): List of connection dictionaries
+        databases (list): List of database dictionaries
+        filename (str): Output CSV filename (default: timestamped combined file)
+        
+    Returns:
+        None: Function writes to file and logs results
+        
+    Raises:
+        None: All exceptions are caught and logged
+    """
+    # Check if there's connections data to export
+    if not connections:
+        logger.warning("No connections data available for combined file")
+        return
+
+    # Generate timestamped filename with subdomain prefix if not provided
+    if filename is None:
+        filename = f'{SUBDOMAIN_PREFIX}.connections-databases_{timestamp}.csv'
+
+    logger.info(f"Creating combined file with {len(connections)} connections and {len(databases)} databases")
+
+    # Create a lookup dictionary for databases by connection_qualified_name
+    databases_by_connection = {}
+    for db in databases:
+        conn_qualified_name = db.get('connection_qualified_name', '')
+        if conn_qualified_name not in databases_by_connection:
+            databases_by_connection[conn_qualified_name] = []
+        databases_by_connection[conn_qualified_name].append(db)
+
+    # Define CSV column headers in the specified order
+    fieldnames = ['connector_name', 'connection_name', 'category', 'type_name', 'name']
+    
+    combined_data = []
+    
+    # Perform left join: iterate through connections and add matching databases
+    for connection in connections:
+        conn_qualified_name = connection.get('connection_qualified_name', '')
+        matching_databases = databases_by_connection.get(conn_qualified_name, [])
+        
+        if matching_databases:
+            # Add a row for each matching database
+            for database in matching_databases:
+                combined_row = {
+                    'connector_name': connection.get('connector_name', ''),
+                    'connection_name': connection.get('connection_name', ''),
+                    'category': connection.get('category', ''),
+                    'type_name': database.get('type_name', ''),
+                    'name': database.get('name', '')
+                }
+                combined_data.append(combined_row)
+        else:
+            # Add connection row with empty database fields (left join behavior)
+            combined_row = {
+                'connector_name': connection.get('connector_name', ''),
+                'connection_name': connection.get('connection_name', ''),
+                'category': connection.get('category', ''),
+                'type_name': '',
+                'name': ''
             }
-        
-        # Export connections to CSV
-        export_connections_to_csv(connections, subdomain, subdomain_logger)
-        
-        # Fetch databases for each connection
-        all_databases = []
-        for connection in connections:
-            connection_qualified_name = connection.get('connection_qualified_name', '')
-            connector_name = connection.get('connector_name', '')
-            
-            if connection_qualified_name:
-                databases = get_databases(connection_qualified_name, connector_name, 
-                                        subdomain, base_url, auth_token, subdomain_logger)
-                if databases:
-                    all_databases.extend(databases)
-                    subdomain_logger.info(f"Found {len(databases)} databases for connection: {connection_qualified_name}")
-        
-        # Export databases to CSV
-        export_databases_to_csv(all_databases, subdomain, subdomain_logger)
-        
-        # Create combined CSV with subdomain column
-        create_combined_csv(connections, all_databases, subdomain, subdomain_logger)
-        
-        subdomain_logger.info(f"Completed processing for subdomain: {subdomain}")
-        subdomain_logger.info(f"Total connections: {len(connections)}, Total databases: {len(all_databases)}")
-        
-        return {
-            'subdomain': subdomain,
-            'connections': len(connections),
-            'databases': len(all_databases),
-            'status': 'success'
-        }
-        
-    except Exception as e:
-        subdomain_logger.error(f"Error processing subdomain {subdomain}: {e}")
-        return {
-            'subdomain': subdomain,
-            'connections': 0,
-            'databases': 0,
-            'status': 'error',
-            'error': str(e)
-        }
+            combined_data.append(combined_row)
+
+    try:
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        # Write combined data to CSV file with UTF-8 encoding
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()  # Write column headers
+            writer.writerows(combined_data)  # Write data rows
+            logger.info(f"Successfully created combined file: {filepath} with {len(combined_data)} rows")
+    except IOError as e:
+        # Handle file permission or disk space errors
+        logger.error(f"Failed to write combined CSV file: {e}")
 
 
 def main():
     """
-    Main execution function that orchestrates multi-subdomain data extraction.
+    Main execution function that orchestrates the complete data extraction workflow.
+    
+    Workflow steps:
+    1. Clean up old files (logs and outputs older than 30 days)
+    2. Fetch all connections from Atlan connections API
+    3. Export connections data to timestamped CSV file
+    4. For each connection, fetch associated databases
+    5. Export all databases data to timestamped CSV file
+    6. Create combined CSV file by joining connections and databases
+    7. Log completion summary
+    
+    Raises:
+        SystemExit: If no connections are found or critical errors occur
     """
-    try:
-        logger.info("Starting multi-subdomain data extraction process")
-        
-        # Step 1: Clean up old files to prevent disk space issues
-        cleanup_old_files()
-        
-        # Step 2: Process each subdomain
-        results = []
-        for subdomain, token in SUBDOMAIN_AUTH_MAP.items():
-            if not token:
-                logger.warning(f"No authentication token found for subdomain: {subdomain}, skipping")
-                continue
-                
-            result = process_subdomain(subdomain, token)
-            results.append(result)
-        
-        # Step 3: Log overall completion summary
-        successful_subdomains = [r for r in results if r['status'] == 'success']
-        total_connections = sum(r['connections'] for r in successful_subdomains)
-        total_databases = sum(r['databases'] for r in successful_subdomains)
-        
-        logger.info(f"Multi-subdomain extraction completed!")
-        logger.info(f"Processed {len(successful_subdomains)}/{len(SUBDOMAIN_AUTH_MAP)} subdomains successfully")
-        logger.info(f"Total connections across all subdomains: {total_connections}")
-        logger.info(f"Total databases across all subdomains: {total_databases}")
-        
-        # Log any failed subdomains
-        failed_subdomains = [r for r in results if r['status'] == 'error']
-        if failed_subdomains:
-            logger.warning(f"Failed subdomains: {[r['subdomain'] for r in failed_subdomains]}")
-        
-    except KeyboardInterrupt:
-        logger.warning("Process interrupted by user")
-        sys.exit(130)
-    except Exception as e:
-        logger.error(f"Unexpected error in main process: {e}")
+    logger.info("Starting Atlan data extraction process")
+    
+    # Step 1: Clean up old files
+    cleanup_old_files()
+
+    # Step 2: Fetch connections from Atlan API
+    connections = get_connections()
+    if not connections:
+        logger.error("No connections found. Exiting.")
         sys.exit(1)
 
+    # Step 3: Export connections to CSV file
+    export_connections_to_csv(connections)
 
-if __name__ == "__main__":
+    # Step 4: Fetch databases for each connection
+    all_databases = []
+    for connection in connections:
+        connection_qualified_name = connection.get('connection_qualified_name')
+        connector_name = connection.get('connector_name')
+        if connection_qualified_name:
+            # Fetch databases associated with this connection
+            databases = get_databases(connection_qualified_name,
+                                      connector_name)
+            all_databases.extend(databases)
+        else:
+            # Log warning for connections without qualified names
+            logger.warning(f"Connection missing qualified name: {connection}")
+
+    # Step 5: Export all databases to CSV file
+    export_databases_to_csv(all_databases)
+
+    # Step 6: Create combined CSV file by joining connections and databases
+    create_combined_csv(connections, all_databases)
+
+    # Step 7: Log completion summary
+    logger.info(
+        f"Data extraction completed successfully. "
+        f"Processed {len(connections)} connections and {len(all_databases)} databases."
+    )
+
+
+if __name__ == '__main__':
     """
     Entry point for script execution.
+    
+    This block ensures the main() function is only called when the script
+    is executed directly, not when imported as a module.
     """
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("Process interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)

@@ -584,17 +584,16 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         self.assertTrue(expected_filename.endswith('.csv'))
 
     def test_combined_csv_column_order(self):
-        """Test that combined CSV has columns in correct order with subdomain as first column"""
-        expected_fieldnames = ['subdomain', 'connector_name', 'connection_name', 'category', 'type_name', 'name']
+        """Test that combined CSV has columns in correct order"""
+        expected_fieldnames = ['connector_name', 'connection_name', 'category', 'type_name', 'name']
         
-        # Verify column order matches specification (now includes subdomain as first column)
-        self.assertEqual(len(expected_fieldnames), 6)
-        self.assertEqual(expected_fieldnames[0], 'subdomain')
-        self.assertEqual(expected_fieldnames[1], 'connector_name')
-        self.assertEqual(expected_fieldnames[2], 'connection_name')
-        self.assertEqual(expected_fieldnames[3], 'category')
-        self.assertEqual(expected_fieldnames[4], 'type_name')
-        self.assertEqual(expected_fieldnames[5], 'name')
+        # Verify column order matches specification
+        self.assertEqual(len(expected_fieldnames), 5)
+        self.assertEqual(expected_fieldnames[0], 'connector_name')
+        self.assertEqual(expected_fieldnames[1], 'connection_name')
+        self.assertEqual(expected_fieldnames[2], 'category')
+        self.assertEqual(expected_fieldnames[3], 'type_name')
+        self.assertEqual(expected_fieldnames[4], 'name')
 
     def test_subdomain_extraction(self):
         """Test subdomain extraction from various URL formats"""
@@ -624,77 +623,6 @@ class TestAtlanExtractorSimple(unittest.TestCase):
             with self.subTest(url=url):
                 result = extract_subdomain(url)
                 self.assertEqual(result, expected_subdomain)
-
-    def test_multi_subdomain_configuration(self):
-        """Test multi-subdomain configuration parsing and validation"""
-        # Test subdomain_auth_token_map parsing
-        test_config = {
-            "base_url_template": "https://{subdomain}.atlan.com",
-            "subdomain_auth_token_map": {
-                "xyz": "xyz_token_123",
-                "abc": "abc_token_456",
-                "lmn": "lmn_token_789"
-            }
-        }
-        
-        # Verify configuration structure
-        self.assertIn("base_url_template", test_config)
-        self.assertIn("subdomain_auth_token_map", test_config)
-        
-        # Verify base URL template format
-        base_url_template = test_config["base_url_template"]
-        self.assertIn("{subdomain}", base_url_template)
-        
-        # Verify subdomain mapping
-        subdomain_map = test_config["subdomain_auth_token_map"]
-        self.assertEqual(len(subdomain_map), 3)
-        self.assertIn("xyz", subdomain_map)
-        self.assertIn("abc", subdomain_map)
-        self.assertIn("lmn", subdomain_map)
-        
-        # Test URL generation for each subdomain
-        for subdomain, token in subdomain_map.items():
-            generated_url = base_url_template.format(subdomain=subdomain)
-            expected_url = f"https://{subdomain}.atlan.com"
-            self.assertEqual(generated_url, expected_url)
-            self.assertTrue(len(token) > 0)
-
-    def test_combined_csv_with_subdomain_column(self):
-        """Test combined CSV generation with subdomain as first column"""
-        # Test data with subdomain information
-        test_connections = [
-            {
-                'name': 'test-connection',
-                'connection_qualified_name': 'default/databricks/123',
-                'connector_name': 'databricks'
-            }
-        ]
-        
-        test_databases = [
-            {
-                'connection_qualified_name': 'default/databricks/123',
-                'type_name': 'Database',
-                'name': 'test_db'
-            }
-        ]
-        
-        subdomain = 'testcompany'
-        
-        # Verify that combined CSV would include subdomain column
-        expected_combined_row = {
-            'subdomain': subdomain,
-            'connector_name': 'databricks',
-            'connection_name': 'test-connection',
-            'category': 'lake',
-            'type_name': 'Database',
-            'name': 'test_db'
-        }
-        
-        # Validate expected structure
-        self.assertEqual(expected_combined_row['subdomain'], subdomain)
-        self.assertEqual(expected_combined_row['connector_name'], 'databricks')
-        self.assertEqual(expected_combined_row['type_name'], 'Database')
-        self.assertEqual(expected_combined_row['name'], 'test_db')
 
 
 if __name__ == '__main__':
