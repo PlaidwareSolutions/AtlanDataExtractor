@@ -33,7 +33,7 @@
       }
     }
   },
-  "api_map": {
+  "databases_api_map": {
     "alteryx"    :"alteryx_api",
     "api"        :"api_api",
     "app"        :"app_api",

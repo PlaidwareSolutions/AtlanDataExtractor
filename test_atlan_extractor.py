@@ -31,7 +31,7 @@ class TestAtlanExtractorSimple(unittest.TestCase):
                 "url": "/api/getConnections",
                 "payload": {"dsl": {"size": 400}}
             },
-            "api_map": {"databricks": "databases_api"},
+            "databases_api_map": {"databricks": "databases_api"},
             "databases_api": {
                 "url": "/api/getDatabases",
                 "payload": {

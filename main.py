@@ -306,8 +306,8 @@ def get_databases(connection_qualified_name, connector_name):
         f"Fetching databases for connection: {connection_qualified_name}")
 
     # Get API endpoint and payload template from configuration
-    url = config[config["api_map"][connector_name]]['url']
-    payload_template = config[config["api_map"][connector_name]]['payload']
+    url = config[config["databases_api_map"][connector_name]]['url']
+    payload_template = config[config["databases_api_map"][connector_name]]['payload']
 
     # Convert payload to JSON string and replace placeholder with actual connection qualified name
     try:
