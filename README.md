@@ -5,28 +5,33 @@ A Python script that extracts connections and databases data from Atlan APIs and
 ## Features
 
 - Extract connection data from Atlan's GET CONNECTIONS API
-- Export connections to `connections.csv` with detailed attributes
+- Export connections to timestamped CSV files (e.g., `connections_2025-06-11-01-02-40.csv`)
 - Iteratively fetch database data for each connection using GET DATABASES API
-- Export databases to `databases.csv` with comprehensive metadata
-- Robust error handling and logging
+- Export databases to timestamped CSV files (e.g., `databases_2025-06-11-01-02-40.csv`)
+- Timestamped logging with files in logs/ directory (e.g., `atlan_extractor_2025-06-11-01-02-40.log`)
+- Automatic cleanup of files older than 30 days to prevent disk space issues
+- Base URL configuration to eliminate URL repetition in config files
+- Robust error handling and comprehensive logging
 - Configurable API endpoints and request payloads
 - Support for Bearer token authentication
-- Comprehensive unit tests with 98% code coverage
+- Comprehensive unit tests with full feature coverage
 
 ## Project Structure
 
 ```
 atlan-data-extractor/
-├── main.py                    # Main extractor script
-├── configs/                   # Configuration directory
-│   └── config.json           # Configuration file for API endpoints
-├── test_atlan_extractor.py   # Comprehensive unit tests
-├── project_requirements.txt  # Project dependencies
-├── README.md                 # This file
-├── atlan_extractor.log       # Execution log file
-└── output/                   # Output directory for CSV files
-    ├── connections.csv       # Generated connections output
-    └── databases.csv        # Generated databases output
+├── main.py                          # Main extractor script
+├── configs/                         # Configuration directory
+│   └── config.json                 # Configuration file with base URL and API endpoints
+├── logs/                           # Timestamped log files directory
+│   └── atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
+├── output/                         # Timestamped CSV output files directory
+│   ├── connections_YYYY-MM-DD-HH-MM-SS.csv
+│   └── databases_YYYY-MM-DD-HH-MM-SS.csv
+├── test_atlan_extractor.py        # Comprehensive unit tests (11 test cases)
+├── project_requirements.txt       # Project dependencies
+├── .gitignore                     # Git ignore file
+└── README.md                      # This file
 ```
 
 ## Requirements

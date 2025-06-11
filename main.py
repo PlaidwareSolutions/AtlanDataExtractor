@@ -445,16 +445,16 @@ def main():
     # Step 1: Clean up old files
     cleanup_old_files()
 
-    # Step 1: Fetch connections from Atlan API
+    # Step 2: Fetch connections from Atlan API
     connections = get_connections()
     if not connections:
         logger.error("No connections found. Exiting.")
         sys.exit(1)
 
-    # Step 2: Export connections to CSV file
+    # Step 3: Export connections to CSV file
     export_connections_to_csv(connections)
 
-    # Step 3: Fetch databases for each connection
+    # Step 4: Fetch databases for each connection
     all_databases = []
     for connection in connections:
         connection_qualified_name = connection.get('connection_qualified_name')
@@ -468,10 +468,10 @@ def main():
             # Log warning for connections without qualified names
             logger.warning(f"Connection missing qualified name: {connection}")
 
-    # Step 4: Export all databases to CSV file
+    # Step 5: Export all databases to CSV file
     export_databases_to_csv(all_databases)
 
-    # Step 5: Log completion summary
+    # Step 6: Log completion summary
     logger.info(
         f"Data extraction completed successfully. "
         f"Processed {len(connections)} connections and {len(all_databases)} databases."

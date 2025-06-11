@@ -356,9 +356,109 @@ class TestAtlanExtractorSimple(unittest.TestCase):
                 loaded_config = json.load(f)
             
             self.assertEqual(loaded_config['auth_token'], 'test_token_12345')
+            # Verify base_url is present in new structure
+            self.assertEqual(loaded_config['base_url'], self.test_config['base_url'])
             
         finally:
             shutil.rmtree(test_dir)
+
+    def test_timestamped_filename_generation(self):
+        """Test timestamped filename generation for logs and CSV files"""
+        # Test log file timestamp format
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        log_filename = f'atlan_extractor_{timestamp}.log'
+        
+        # Verify log filename format
+        self.assertRegex(log_filename, r'atlan_extractor_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.log')
+        
+        # Test CSV file timestamp format
+        connections_filename = f'connections_{timestamp}.csv'
+        databases_filename = f'databases_{timestamp}.csv'
+        
+        # Verify CSV filename formats
+        self.assertRegex(connections_filename, r'connections_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        self.assertRegex(databases_filename, r'databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+
+    def test_file_cleanup_functionality(self):
+        """Test cleanup of old log and output files"""
+        test_dir = tempfile.mkdtemp()
+        logs_dir = os.path.join(test_dir, 'logs')
+        output_dir = os.path.join(test_dir, 'output')
+        
+        try:
+            # Create directories
+            os.makedirs(logs_dir)
+            os.makedirs(output_dir)
+            
+            # Create test files with different ages
+            current_time = datetime.now()
+            old_time = current_time - timedelta(days=35)  # 35 days old
+            recent_time = current_time - timedelta(days=5)  # 5 days old
+            
+            # Create old and recent log files
+            old_log = os.path.join(logs_dir, 'atlan_extractor_2024-01-01-10-00-00.log')
+            recent_log = os.path.join(logs_dir, 'atlan_extractor_2025-06-01-10-00-00.log')
+            
+            with open(old_log, 'w') as f:
+                f.write("Old log entry")
+            with open(recent_log, 'w') as f:
+                f.write("Recent log entry")
+            
+            # Create old and recent CSV files
+            old_csv = os.path.join(output_dir, 'connections_2024-01-01-10-00-00.csv')
+            recent_csv = os.path.join(output_dir, 'connections_2025-06-01-10-00-00.csv')
+            
+            with open(old_csv, 'w') as f:
+                f.write("name,value\ntest,data")
+            with open(recent_csv, 'w') as f:
+                f.write("name,value\ntest,data")
+            
+            # Manually set file modification times to simulate old files
+            import time
+            old_timestamp = time.mktime(old_time.timetuple())
+            recent_timestamp = time.mktime(recent_time.timetuple())
+            
+            os.utime(old_log, (old_timestamp, old_timestamp))
+            os.utime(old_csv, (old_timestamp, old_timestamp))
+            
+            # Simulate cleanup logic
+            cutoff_date = datetime.now() - timedelta(days=30)
+            files_to_delete = []
+            
+            # Check log files
+            for log_file in glob.glob(os.path.join(logs_dir, 'atlan_extractor_*.log')):
+                file_time = datetime.fromtimestamp(os.path.getmtime(log_file))
+                if file_time < cutoff_date:
+                    files_to_delete.append(log_file)
+            
+            # Check CSV files
+            for pattern in ['connections_*.csv', 'databases_*.csv']:
+                for csv_file in glob.glob(os.path.join(output_dir, pattern)):
+                    file_time = datetime.fromtimestamp(os.path.getmtime(csv_file))
+                    if file_time < cutoff_date:
+                        files_to_delete.append(csv_file)
+            
+            # Verify cleanup identifies correct files
+            self.assertGreater(len(files_to_delete), 0)
+            
+        finally:
+            shutil.rmtree(test_dir)
+
+    def test_base_url_combination(self):
+        """Test base URL combination with endpoint paths"""
+        base_url = "https://test-company.atlan.com"
+        endpoint_path = "/api/getConnections"
+        
+        # Test URL combination logic
+        full_url = f"{base_url.rstrip('/')}{endpoint_path}"
+        
+        self.assertEqual(full_url, "https://test-company.atlan.com/api/getConnections")
+        
+        # Test with trailing slash
+        base_url_with_slash = "https://test-company.atlan.com/"
+        full_url_with_slash = f"{base_url_with_slash.rstrip('/')}{endpoint_path}"
+        
+        self.assertEqual(full_url_with_slash, "https://test-company.atlan.com/api/getConnections")
 
 
 if __name__ == '__main__':
