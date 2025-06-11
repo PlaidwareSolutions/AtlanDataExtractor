@@ -1,6 +1,10 @@
 {
-  "base_url": "https://xyz.atlan.com",
-  "auth_token": "ehdasdjfasdfa.asdfasdf",
+  "base_url_template": "https://{subdomain}.atlan.com",
+  "subdomain_auth_token_map": {
+    "xyz": "xyz_token_here",
+    "abc": "abc_token_here",
+    "lmn": "lmn_token_here"
+  },
   "connections_api": {
     "url": "/api/getConnections",
     "payload": {

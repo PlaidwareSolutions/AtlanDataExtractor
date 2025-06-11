@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
-Atlan Data Extractor
+Atlan Data Extractor - Multi-Subdomain Version
 
-This script extracts connections and databases data from Atlan APIs
-and exports the data to CSV files.
+This script extracts connections and databases data from multiple Atlan subdomains
+and exports the data to CSV files with subdomain prefixes.
 
 The script performs the following operations:
-1. Loads configuration from config.json file
-2. Authenticates using Bearer token (from environment variable or config)
-3. Fetches connections data from Atlan connections API
-4. Exports connections data to connections.csv
+1. Loads configuration from config.json file with subdomain_auth_token_map
+2. Processes each subdomain with its specific authentication token
+3. Fetches connections data from each Atlan subdomain
+4. Exports connections data to subdomain.connections_timestamp.csv
 5. For each connection, fetches associated databases
-6. Exports all databases data to databases.csv
+6. Exports all databases data to subdomain.databases_timestamp.csv
+7. Creates combined CSV with subdomain column as first field
 
-Author: Nawaz Mohammad (U787320)
-Version: 1.0
+Author: Enhanced for multi-subdomain support
+Version: 2.0
 Dependencies: requests, json, csv, logging, sys, os
 """
 
