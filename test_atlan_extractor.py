@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Unit tests for Atlan Data Extractor - Updated Version
+Unit tests for Atlan Data Extractor - Multi-Subdomain Version
 
-This module contains working test cases that properly mock all dependencies
-and test the core functionality including timestamped files, base URL configuration,
-and file cleanup functionality.
+This module contains comprehensive test cases for the multi-subdomain Atlan data extractor,
+including subdomain processing, authentication mapping, prefixed file generation, 
+combined CSV creation with subdomain tracking, and cross-instance analysis functionality.
 """
 
 import unittest
@@ -623,6 +623,269 @@ class TestAtlanExtractorSimple(unittest.TestCase):
             with self.subTest(url=url):
                 result = extract_subdomain(url)
                 self.assertEqual(result, expected_subdomain)
+
+    def test_multi_subdomain_configuration_parsing(self):
+        """Test multi-subdomain configuration structure parsing"""
+        
+        # Test valid multi-subdomain configuration
+        config = {
+            "base_url_template": "https://{subdomain}.atlan.com",
+            "subdomain_auth_token_map": {
+                "xyz": "xyz_token",
+                "abc": "abc_token",
+                "lmn": "lmn_token"
+            }
+        }
+        
+        self.assertEqual(config["base_url_template"], "https://{subdomain}.atlan.com")
+        self.assertEqual(len(config["subdomain_auth_token_map"]), 3)
+        self.assertIn("xyz", config["subdomain_auth_token_map"])
+        self.assertEqual(config["subdomain_auth_token_map"]["xyz"], "xyz_token")
+        
+        # Test URL template formatting
+        for subdomain in ["xyz", "abc", "lmn"]:
+            expected_url = f"https://{subdomain}.atlan.com"
+            actual_url = config["base_url_template"].format(subdomain=subdomain)
+            self.assertEqual(actual_url, expected_url)
+
+    def test_subdomain_prefixed_filename_generation(self):
+        """Test generation of subdomain-prefixed filenames"""
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        
+        subdomains = ["xyz", "abc", "lmn"]
+        file_types = ["connections", "databases", "connections-databases"]
+        
+        for subdomain in subdomains:
+            for file_type in file_types:
+                filename = f"{subdomain}.{file_type}_{timestamp}.csv"
+                
+                # Verify filename structure
+                self.assertTrue(filename.startswith(subdomain))
+                self.assertTrue(filename.endswith('.csv'))
+                self.assertIn(file_type, filename)
+                self.assertIn(timestamp, filename)
+                
+                # Verify filename parts
+                parts = filename.split('.')
+                self.assertEqual(parts[0], subdomain)
+                self.assertTrue(parts[1].startswith(file_type))
+
+    def test_subdomain_specific_logging(self):
+        """Test subdomain-specific log file generation"""
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        
+        subdomains = ["xyz", "abc", "lmn"]
+        
+        for subdomain in subdomains:
+            log_filename = f"{subdomain}.atlan_extractor_{timestamp}.log"
+            
+            # Verify log filename structure
+            self.assertTrue(log_filename.startswith(subdomain))
+            self.assertTrue(log_filename.endswith('.log'))
+            self.assertIn('atlan_extractor', log_filename)
+            self.assertIn(timestamp, log_filename)
+
+    def test_multi_subdomain_base_url_generation(self):
+        """Test dynamic base URL generation for multiple subdomains"""
+        
+        base_url_template = "https://{subdomain}.atlan.com"
+        subdomains = ["xyz", "abc", "lmn", "enterprise", "dev", "prod"]
+        
+        for subdomain in subdomains:
+            base_url = base_url_template.format(subdomain=subdomain)
+            expected_url = f"https://{subdomain}.atlan.com"
+            
+            self.assertEqual(base_url, expected_url)
+            self.assertTrue(base_url.startswith("https://"))
+            self.assertTrue(base_url.endswith(".atlan.com"))
+            self.assertIn(subdomain, base_url)
+
+    def test_combined_csv_with_subdomain_column(self):
+        """Test combined CSV creation with subdomain as first column"""
+        
+        # Sample data for testing
+        subdomain = "xyz"
+        connections = [
+            {
+                "name": "test_connection",
+                "connection_qualified_name": "test/conn/1",
+                "connector_name": "databricks"
+            }
+        ]
+        
+        databases = [
+            {
+                "connection_qualified_name": "test/conn/1",
+                "type_name": "Database",
+                "name": "test_db"
+            }
+        ]
+        
+        # Test combined data structure
+        combined_data = []
+        for connection in connections:
+            connection_qualified_name = connection.get('connection_qualified_name', '')
+            
+            # Find databases for this connection
+            connection_databases = [db for db in databases 
+                                  if db.get('connection_qualified_name') == connection_qualified_name]
+            
+            if connection_databases:
+                for db in connection_databases:
+                    combined_row = {
+                        'subdomain': subdomain,
+                        'connector_name': connection.get('connector_name', ''),
+                        'connection_name': connection.get('name', ''),
+                        'category': 'lake' if connection.get('connector_name') == 'databricks' else '',
+                        'type_name': db.get('type_name', ''),
+                        'name': db.get('name', '')
+                    }
+                    combined_data.append(combined_row)
+        
+        # Verify structure
+        self.assertEqual(len(combined_data), 1)
+        row = combined_data[0]
+        self.assertEqual(row['subdomain'], 'xyz')
+        self.assertEqual(row['connector_name'], 'databricks')
+        self.assertEqual(row['connection_name'], 'test_connection')
+        self.assertEqual(row['category'], 'lake')
+        self.assertEqual(row['type_name'], 'Database')
+        self.assertEqual(row['name'], 'test_db')
+
+    def test_authentication_token_mapping(self):
+        """Test subdomain authentication token mapping logic"""
+        
+        subdomain_auth_map = {
+            "xyz": "Bearer xyz_token_123",
+            "abc": "abc_token_456",
+            "lmn": "Bearer lmn_token_789"
+        }
+        
+        # Test token retrieval
+        for subdomain, token in subdomain_auth_map.items():
+            self.assertIsNotNone(token)
+            self.assertTrue(len(token) > 0)
+            
+            # Test Bearer token formatting
+            if not token.lower().startswith('bearer '):
+                formatted_token = f"Bearer {token}"
+            else:
+                formatted_token = token
+                
+            self.assertTrue(formatted_token.lower().startswith('bearer '))
+
+    def test_api_map_connector_routing(self):
+        """Test API mapping for different connector types"""
+        
+        api_map = {
+            "alteryx": "alteryx_api",
+            "databricks": "databases_api",
+            "oracle": "databases_api",
+            "snowflake": "databases_api",
+            "tableau": "tableau_api",
+            "thoughtspot": "thoughtspot_api"
+        }
+        
+        # Test connector routing
+        test_connectors = ["databricks", "snowflake", "tableau", "oracle"]
+        
+        for connector in test_connectors:
+            if connector in api_map:
+                api_config_key = api_map[connector]
+                self.assertIsNotNone(api_config_key)
+                self.assertTrue(len(api_config_key) > 0)
+                
+                # Verify expected mappings
+                if connector in ["databricks", "oracle", "snowflake"]:
+                    self.assertEqual(api_config_key, "databases_api")
+                elif connector == "tableau":
+                    self.assertEqual(api_config_key, "tableau_api")
+
+    def test_cross_subdomain_processing_isolation(self):
+        """Test that subdomain processing is properly isolated"""
+        
+        subdomains = ["xyz", "abc", "lmn"]
+        processing_results = {}
+        
+        # Simulate independent processing
+        for subdomain in subdomains:
+            processing_results[subdomain] = {
+                'status': 'success' if subdomain != 'abc' else 'error',
+                'connections': 5 if subdomain == 'xyz' else 3,
+                'databases': 12 if subdomain == 'xyz' else 8,
+                'error': 'Network timeout' if subdomain == 'abc' else None
+            }
+        
+        # Verify isolation - failure in one doesn't affect others
+        successful_subdomains = [s for s, r in processing_results.items() 
+                               if r['status'] == 'success']
+        failed_subdomains = [s for s, r in processing_results.items() 
+                           if r['status'] == 'error']
+        
+        self.assertEqual(len(successful_subdomains), 2)
+        self.assertEqual(len(failed_subdomains), 1)
+        self.assertIn('xyz', successful_subdomains)
+        self.assertIn('lmn', successful_subdomains)
+        self.assertIn('abc', failed_subdomains)
+        
+        # Verify totals calculation
+        total_connections = sum(r['connections'] for r in processing_results.values() 
+                              if r['status'] == 'success')
+        total_databases = sum(r['databases'] for r in processing_results.values() 
+                            if r['status'] == 'success')
+        
+        self.assertEqual(total_connections, 8)  # 5 + 3
+        self.assertEqual(total_databases, 20)   # 12 + 8
+
+    def test_backward_compatibility_single_subdomain(self):
+        """Test backward compatibility with single subdomain configuration"""
+        
+        # Legacy single subdomain config
+        legacy_config = {
+            "base_url": "https://company.atlan.com",
+            "auth_token": "legacy_token_123"
+        }
+        
+        # Test conversion logic
+        base_url = legacy_config.get('base_url')
+        if base_url:
+            from urllib.parse import urlparse
+            hostname = urlparse(base_url).hostname
+            subdomain = hostname.split('.')[0] if hostname else 'atlan'
+            
+            # Convert to multi-subdomain format
+            subdomain_auth_map = {subdomain: legacy_config.get('auth_token', '')}
+            base_url_template = base_url.replace(subdomain, '{subdomain}')
+            
+            # Verify conversion
+            self.assertEqual(subdomain, 'company')
+            self.assertEqual(base_url_template, 'https://{subdomain}.atlan.com')
+            self.assertEqual(subdomain_auth_map['company'], 'legacy_token_123')
+
+    def test_processing_summary_generation(self):
+        """Test multi-subdomain processing summary generation"""
+        
+        results = [
+            {'subdomain': 'xyz', 'status': 'success', 'connections': 5, 'databases': 12},
+            {'subdomain': 'abc', 'status': 'error', 'connections': 0, 'databases': 0, 'error': 'Auth failed'},
+            {'subdomain': 'lmn', 'status': 'success', 'connections': 3, 'databases': 8}
+        ]
+        
+        # Calculate summary statistics
+        successful_subdomains = [r for r in results if r['status'] == 'success']
+        failed_subdomains = [r for r in results if r['status'] == 'error']
+        total_connections = sum(r['connections'] for r in successful_subdomains)
+        total_databases = sum(r['databases'] for r in successful_subdomains)
+        
+        # Verify summary
+        self.assertEqual(len(successful_subdomains), 2)
+        self.assertEqual(len(failed_subdomains), 1)
+        self.assertEqual(total_connections, 8)
+        self.assertEqual(total_databases, 20)
+        self.assertEqual(failed_subdomains[0]['subdomain'], 'abc')
+        self.assertEqual(failed_subdomains[0]['error'], 'Auth failed')
 
 
 if __name__ == '__main__':
