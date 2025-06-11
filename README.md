@@ -14,7 +14,7 @@ A robust Python utility for extracting and exporting connection and database met
 - **Secure Authentication**: Bearer token authentication with environment variable support
 - **Enterprise-Ready**: Designed for production environments with proper logging and monitoring
 - **Automatic File Cleanup**: Removes files older than 30 days to prevent disk space issues
-- **Backward Compatibility**: Supports legacy single-subdomain configurations
+- **Clean Architecture**: Designed for greenfield multi-subdomain deployments
 
 ## Project Structure
 
@@ -137,16 +137,7 @@ Create `configs/config.json` with your Atlan subdomain details:
 }
 ```
 
-### Single Subdomain (Backward Compatibility)
 
-For single subdomain setups, you can still use the legacy format:
-
-```json
-{
-  "base_url": "https://your-instance.atlan.com",
-  "auth_token": "your_bearer_token_here"
-}
-```
 
 ### Environment Variables (Optional)
 

@@ -48,13 +48,6 @@ with open('configs/config.json', 'r') as f:
 BASE_URL_TEMPLATE = config.get('base_url_template', '')
 SUBDOMAIN_AUTH_MAP = config.get('subdomain_auth_token_map', {})
 
-# Backward compatibility: check for single subdomain configuration
-if not BASE_URL_TEMPLATE and config.get('base_url'):
-    BASE_URL = config.get('base_url')
-    subdomain = urlparse(BASE_URL).hostname.split('.')[0] if urlparse(BASE_URL).hostname else 'atlan'
-    SUBDOMAIN_AUTH_MAP = {subdomain: config.get('auth_token', '')}
-    BASE_URL_TEMPLATE = BASE_URL.replace(subdomain, '{subdomain}')
-
 if not BASE_URL_TEMPLATE:
     print("ERROR: Base URL template not found in configuration")
     sys.exit(1)

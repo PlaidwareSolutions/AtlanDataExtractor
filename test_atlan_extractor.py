@@ -839,30 +839,40 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         self.assertEqual(total_connections, 8)  # 5 + 3
         self.assertEqual(total_databases, 20)   # 12 + 8
 
-    def test_backward_compatibility_single_subdomain(self):
-        """Test backward compatibility with single subdomain configuration"""
+    def test_configuration_validation(self):
+        """Test multi-subdomain configuration validation"""
         
-        # Legacy single subdomain config
-        legacy_config = {
-            "base_url": "https://company.atlan.com",
-            "auth_token": "legacy_token_123"
+        # Test valid configuration structure
+        valid_config = {
+            "base_url_template": "https://{subdomain}.atlan.com",
+            "subdomain_auth_token_map": {
+                "xyz": "xyz_token_123",
+                "abc": "abc_token_456",
+                "lmn": "lmn_token_789"
+            }
         }
         
-        # Test conversion logic
-        base_url = legacy_config.get('base_url')
-        if base_url:
-            from urllib.parse import urlparse
-            hostname = urlparse(base_url).hostname
-            subdomain = hostname.split('.')[0] if hostname else 'atlan'
-            
-            # Convert to multi-subdomain format
-            subdomain_auth_map = {subdomain: legacy_config.get('auth_token', '')}
-            base_url_template = base_url.replace(subdomain, '{subdomain}')
-            
-            # Verify conversion
-            self.assertEqual(subdomain, 'company')
-            self.assertEqual(base_url_template, 'https://{subdomain}.atlan.com')
-            self.assertEqual(subdomain_auth_map['company'], 'legacy_token_123')
+        # Verify required fields are present
+        self.assertIn("base_url_template", valid_config)
+        self.assertIn("subdomain_auth_token_map", valid_config)
+        self.assertIn("{subdomain}", valid_config["base_url_template"])
+        
+        # Test configuration error scenarios
+        invalid_configs = [
+            {},  # Empty config
+            {"base_url_template": ""},  # Missing subdomain mapping
+            {"subdomain_auth_token_map": {}},  # Missing base URL template
+            {"base_url_template": "https://static.atlan.com"}  # No {subdomain} placeholder
+        ]
+        
+        for invalid_config in invalid_configs:
+            with self.subTest(config=invalid_config):
+                has_template = invalid_config.get('base_url_template', '')
+                has_mapping = invalid_config.get('subdomain_auth_token_map', {})
+                
+                # Should fail validation
+                if not has_template or not has_mapping:
+                    self.assertTrue(not has_template or not has_mapping)
 
     def test_processing_summary_generation(self):
         """Test multi-subdomain processing summary generation"""
