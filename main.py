@@ -24,6 +24,16 @@ import requests
 import logging
 import sys
 import os
+from datetime import datetime
+
+# Create logs directory for timestamped log files if it doesn't exist
+LOGS_DIR = 'logs'
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
+
+# Generate timestamped log filename
+timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+log_filename = os.path.join(LOGS_DIR, f'atlan_extractor_{timestamp}.log')
 
 # Configure logging to both file and console for comprehensive monitoring
 # Log level INFO provides detailed execution flow without debug verbosity
@@ -31,7 +41,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('atlan_extractor.log'),  # Persistent log file
+        logging.FileHandler(log_filename),  # Timestamped log file in logs directory
         logging.StreamHandler(sys.stdout)  # Real-time console output
     ])
 
@@ -47,6 +57,12 @@ OUTPUT_DIR = 'output'
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
     logger.info(f"Created output directory: {OUTPUT_DIR}")
+
+# Extract base URL from configuration
+BASE_URL = config.get('base_url', '')
+if not BASE_URL:
+    logger.error("Base URL not found in configuration")
+    sys.exit(1)
 
 
 def get_auth_token():
@@ -82,12 +98,12 @@ def get_auth_token():
     return f'Bearer {token}'
 
 
-def make_api_request(url, payload):
+def make_api_request(endpoint_path, payload):
     """
     Make HTTP POST request to Atlan API with authentication and error handling.
     
     Args:
-        url (str): API endpoint URL
+        endpoint_path (str): API endpoint path (relative to base URL)
         payload (dict): JSON payload for the POST request
         
     Returns:
@@ -96,6 +112,9 @@ def make_api_request(url, payload):
     Raises:
         None: All exceptions are caught and logged
     """
+    # Combine base URL with endpoint path to create full URL
+    full_url = f"{BASE_URL.rstrip('/')}{endpoint_path}"
+    
     # Prepare headers with authentication and content type
     headers = {
         'Authorization': get_auth_token(),
@@ -105,10 +124,10 @@ def make_api_request(url, payload):
     response = None  # Initialize response variable for proper scope
     try:
         # Log the URL being used for the API request
-        logger.info(f"Making API request to URL: {url}")
+        logger.info(f"Making API request to URL: {full_url}")
         
         # Make POST request with timeout to prevent hanging
-        response = requests.post(url,
+        response = requests.post(full_url,
                                  headers=headers,
                                  data=json.dumps(payload),
                                  timeout=30)
