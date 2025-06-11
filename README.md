@@ -8,6 +8,8 @@ A Python script that extracts connections and databases data from Atlan APIs and
 - Export connections to timestamped CSV files (e.g., `connections_2025-06-11-01-02-40.csv`)
 - Iteratively fetch database data for each connection using GET DATABASES API
 - Export databases to timestamped CSV files (e.g., `databases_2025-06-11-01-02-40.csv`)
+- Create combined CSV file joining connections and databases (e.g., `connections-databases_2025-06-11-01-02-40.csv`)
+- Left join logic ensures all connections appear even without matching databases
 - Timestamped logging with files in logs/ directory (e.g., `atlan_extractor_2025-06-11-01-02-40.log`)
 - Automatic cleanup of files older than 30 days to prevent disk space issues
 - Base URL configuration to eliminate URL repetition in config files
@@ -27,8 +29,9 @@ atlan-data-extractor/
 │   └── atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
 ├── output/                         # Timestamped CSV output files directory
 │   ├── connections_YYYY-MM-DD-HH-MM-SS.csv
-│   └── databases_YYYY-MM-DD-HH-MM-SS.csv
-├── test_atlan_extractor.py        # Comprehensive unit tests (11 test cases)
+│   ├── databases_YYYY-MM-DD-HH-MM-SS.csv
+│   └── connections-databases_YYYY-MM-DD-HH-MM-SS.csv
+├── test_atlan_extractor.py        # Comprehensive unit tests (14 test cases)
 ├── project_requirements.txt       # Project dependencies
 ├── .gitignore                     # Git ignore file
 └── README.md                      # This file
@@ -213,21 +216,25 @@ The updated test suite validates:
 - **Configs Directory Structure**: Tests the new configs/ directory for configuration files
 - **URL Logging**: Validates that API URLs are properly logged during requests
 - **Output Directory**: Tests CSV export functionality to output/ directory
+- **Combined CSV Left Join**: Tests the joining of connections and databases with left join logic
+- **Timestamped Filenames**: Tests generation of timestamped log and CSV files
+- **File Cleanup**: Tests automatic deletion of files older than 30 days
+- **Base URL Configuration**: Tests proper URL combination from base URL and endpoints
 - Authentication token handling (environment vs config)
 - JSON processing and data extraction
 - Error handling and edge cases
-- CSV export functionality
 
 ### Test Coverage Results
 
-The test suite achieves comprehensive coverage with 8 focused test cases covering:
+The test suite achieves comprehensive coverage with 14 focused test cases covering:
 
 - **Configuration Management**: Valid/invalid config files, authentication methods
 - **API Request Handling**: Success scenarios, HTTP errors, network failures, JSON parsing
 - **Data Processing**: Entity validation, malformed data handling, empty responses
-- **CSV Export Operations**: File creation, permission errors, data integrity
+- **CSV Export Operations**: Individual and combined file creation, permission errors, data integrity
+- **Combined Data Processing**: Left join logic, column ordering, filename generation
+- **File Management**: Timestamped naming, cleanup functionality, directory structure
 - **Workflow Execution**: End-to-end processing, error scenarios, edge cases
-- **Main Function**: Normal execution, interrupts, unexpected errors
 
 ### Test Categories
 

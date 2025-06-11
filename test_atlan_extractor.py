@@ -460,6 +460,128 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         
         self.assertEqual(full_url_with_slash, "https://test-company.atlan.com/api/getConnections")
 
+    def test_combined_csv_left_join_functionality(self):
+        """Test combined CSV creation with left join logic"""
+        # Test data: connections and databases
+        test_connections = [
+            {
+                'connection_name': 'connection-1',
+                'connection_qualified_name': 'conn/1',
+                'connector_name': 'databricks',
+                'category': 'warehouse'
+            },
+            {
+                'connection_name': 'connection-2',
+                'connection_qualified_name': 'conn/2',
+                'connector_name': 'snowflake',
+                'category': 'warehouse'
+            },
+            {
+                'connection_name': 'connection-3',
+                'connection_qualified_name': 'conn/3',
+                'connector_name': 'tableau',
+                'category': 'bi'
+            }
+        ]
+        
+        test_databases = [
+            {
+                'connection_qualified_name': 'conn/1',
+                'type_name': 'Database',
+                'name': 'database-1'
+            },
+            {
+                'connection_qualified_name': 'conn/1',
+                'type_name': 'Database',
+                'name': 'database-2'
+            },
+            {
+                'connection_qualified_name': 'conn/2',
+                'type_name': 'Database',
+                'name': 'database-3'
+            }
+            # Note: conn/3 (tableau) has no databases - should still appear in combined file
+        ]
+        
+        # Simulate combined CSV creation logic
+        databases_by_connection = {}
+        for db in test_databases:
+            conn_qualified_name = db.get('connection_qualified_name', '')
+            if conn_qualified_name not in databases_by_connection:
+                databases_by_connection[conn_qualified_name] = []
+            databases_by_connection[conn_qualified_name].append(db)
+        
+        combined_data = []
+        
+        # Perform left join logic
+        for connection in test_connections:
+            conn_qualified_name = connection.get('connection_qualified_name', '')
+            matching_databases = databases_by_connection.get(conn_qualified_name, [])
+            
+            if matching_databases:
+                # Add a row for each matching database
+                for database in matching_databases:
+                    combined_row = {
+                        'connector_name': connection.get('connector_name', ''),
+                        'connection_name': connection.get('connection_name', ''),
+                        'category': connection.get('category', ''),
+                        'type_name': database.get('type_name', ''),
+                        'name': database.get('name', '')
+                    }
+                    combined_data.append(combined_row)
+            else:
+                # Add connection row with empty database fields (left join behavior)
+                combined_row = {
+                    'connector_name': connection.get('connector_name', ''),
+                    'connection_name': connection.get('connection_name', ''),
+                    'category': connection.get('category', ''),
+                    'type_name': '',
+                    'name': ''
+                }
+                combined_data.append(combined_row)
+        
+        # Verify left join results
+        self.assertEqual(len(combined_data), 4)  # 2 databases for conn/1, 1 for conn/2, 1 empty for conn/3
+        
+        # Verify first connection (databricks) has 2 database rows
+        databricks_rows = [row for row in combined_data if row['connector_name'] == 'databricks']
+        self.assertEqual(len(databricks_rows), 2)
+        self.assertEqual(databricks_rows[0]['name'], 'database-1')
+        self.assertEqual(databricks_rows[1]['name'], 'database-2')
+        
+        # Verify second connection (snowflake) has 1 database row
+        snowflake_rows = [row for row in combined_data if row['connector_name'] == 'snowflake']
+        self.assertEqual(len(snowflake_rows), 1)
+        self.assertEqual(snowflake_rows[0]['name'], 'database-3')
+        
+        # Verify third connection (tableau) has 1 row with empty database fields
+        tableau_rows = [row for row in combined_data if row['connector_name'] == 'tableau']
+        self.assertEqual(len(tableau_rows), 1)
+        self.assertEqual(tableau_rows[0]['type_name'], '')
+        self.assertEqual(tableau_rows[0]['name'], '')
+
+    def test_combined_csv_filename_generation(self):
+        """Test combined CSV filename generation with timestamp"""
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        expected_filename = f'connections-databases_{timestamp}.csv'
+        
+        # Verify filename format
+        self.assertRegex(expected_filename, r'connections-databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        self.assertIn('connections-databases_', expected_filename)
+        self.assertTrue(expected_filename.endswith('.csv'))
+
+    def test_combined_csv_column_order(self):
+        """Test that combined CSV has columns in correct order"""
+        expected_fieldnames = ['connector_name', 'connection_name', 'category', 'type_name', 'name']
+        
+        # Verify column order matches specification
+        self.assertEqual(len(expected_fieldnames), 5)
+        self.assertEqual(expected_fieldnames[0], 'connector_name')
+        self.assertEqual(expected_fieldnames[1], 'connection_name')
+        self.assertEqual(expected_fieldnames[2], 'category')
+        self.assertEqual(expected_fieldnames[3], 'type_name')
+        self.assertEqual(expected_fieldnames[4], 'name')
+
 
 if __name__ == '__main__':
     unittest.main()

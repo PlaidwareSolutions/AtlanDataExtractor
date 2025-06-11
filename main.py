@@ -92,7 +92,8 @@ def cleanup_old_files():
     # Clean up old output files
     output_patterns = [
         os.path.join(OUTPUT_DIR, 'connections_*.csv'),
-        os.path.join(OUTPUT_DIR, 'databases_*.csv')
+        os.path.join(OUTPUT_DIR, 'databases_*.csv'),
+        os.path.join(OUTPUT_DIR, 'connections-databases_*.csv')
     ]
     
     for pattern in output_patterns:
@@ -555,7 +556,10 @@ def main():
     # Step 5: Export all databases to CSV file
     export_databases_to_csv(all_databases)
 
-    # Step 6: Log completion summary
+    # Step 6: Create combined CSV file by joining connections and databases
+    create_combined_csv(connections, all_databases)
+
+    # Step 7: Log completion summary
     logger.info(
         f"Data extraction completed successfully. "
         f"Processed {len(connections)} connections and {len(all_databases)} databases."
