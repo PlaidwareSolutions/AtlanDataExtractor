@@ -32,9 +32,11 @@ LOGS_DIR = 'logs'
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
-# Generate timestamped log filename
+# Generate timestamped log filename with subdomain prefix
 timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-log_filename = os.path.join(LOGS_DIR, f'atlan_extractor_{timestamp}.log')
+
+# Temporarily create log file without prefix to load config first
+temp_log_filename = os.path.join(LOGS_DIR, f'atlan_extractor_{timestamp}.log')
 
 # Configure logging to both file and console for comprehensive monitoring
 # Log level INFO provides detailed execution flow without debug verbosity
@@ -64,6 +66,21 @@ BASE_URL = config.get('base_url', '')
 if not BASE_URL:
     logger.error("Base URL not found in configuration")
     sys.exit(1)
+
+# Extract subdomain from base URL for file prefixes
+def extract_subdomain(url):
+    """Extract subdomain from URL for use as file prefix"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ''
+        # Extract first part before .atlan.com or similar
+        parts = hostname.split('.')
+        return parts[0] if parts and len(parts) > 0 else 'atlan'
+    except Exception:
+        return 'atlan'
+
+SUBDOMAIN_PREFIX = extract_subdomain(BASE_URL)
 
 
 def cleanup_old_files():
