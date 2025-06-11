@@ -1,42 +1,37 @@
-# Atlan Data Extractor - Multi-Subdomain Version
+# Atlan Data Extractor
 
-A robust Python utility for extracting and exporting connection and database metadata from multiple Atlan instances simultaneously, designed for enterprise environments with advanced security and error management capabilities.
+A Python script that extracts connections and databases data from Atlan APIs and exports the data to CSV files.
 
 ## Features
 
-- **Multi-Subdomain Processing**: Process multiple Atlan instances (xyz, abc, lmn) in a single execution using subdomain_auth_token_map
-- **Individual Authentication**: Each subdomain uses its own authentication token for secure isolated access
-- **Subdomain-Prefixed File Generation**: All files include subdomain prefix (e.g., `xyz.connections_2025-06-11-15-30-45.csv`)
-- **Base URL Template System**: Flexible `https://{subdomain}.atlan.com` template supports any number of subdomains
-- **Enhanced Combined Dataset**: Creates merged CSV with subdomain as first column plus left join logic ensuring all connections appear
-- **Subdomain-Specific Logging**: Individual log files per subdomain with comprehensive processing details
-- **Sequential API Extraction**: Extract connections from GET CONNECTIONS API, then fetch databases for each connection
-- **Timestamped Output Management**: All CSV files include timestamps for version tracking and historical data management
-- **Automated File Cleanup**: 30-day automatic cleanup of old log and output files to prevent disk space issues
-- **Multi-Connector Support**: Handles databricks, snowflake, oracle, tableau, etc. with dedicated API configurations
-- **Robust Error Handling**: Comprehensive exception handling with detailed logging and graceful failure recovery
-- **Production-Ready Testing**: 17 comprehensive unit tests covering all functionality including multi-subdomain scenarios
+- Extract connection data from Atlan's GET CONNECTIONS API
+- Export connections to timestamped CSV files (e.g., `connections_2025-06-11-01-02-40.csv`)
+- Iteratively fetch database data for each connection using GET DATABASES API
+- Export databases to timestamped CSV files (e.g., `databases_2025-06-11-01-02-40.csv`)
+- Create combined CSV file joining connections and databases (e.g., `connections-databases_2025-06-11-01-02-40.csv`)
+- Left join logic ensures all connections appear even without matching databases
+- Timestamped logging with files in logs/ directory (e.g., `atlan_extractor_2025-06-11-01-02-40.log`)
+- Automatic cleanup of files older than 30 days to prevent disk space issues
+- Base URL configuration to eliminate URL repetition in config files
+- Robust error handling and comprehensive logging
+- Configurable API endpoints and request payloads
+- Support for Bearer token authentication
+- Comprehensive unit tests with full feature coverage
 
 ## Project Structure
 
 ```
 atlan-data-extractor/
-├── main.py                          # Multi-subdomain extractor script
+├── main.py                          # Main extractor script
 ├── configs/                         # Configuration directory
-│   └── config.json                 # Multi-subdomain configuration with auth token mapping
-├── logs/                           # Subdomain-specific timestamped log files
-│   ├── xyz.atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
-│   ├── abc.atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
-│   └── lmn.atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
-├── output/                         # Subdomain-prefixed CSV output files
-│   ├── xyz.connections_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── xyz.databases_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── xyz.connections-databases_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── abc.connections_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── abc.databases_YYYY-MM-DD-HH-MM-SS.csv
-│   ├── abc.connections-databases_YYYY-MM-DD-HH-MM-SS.csv
-│   └── ... (similar files for each subdomain)
-├── test_atlan_extractor.py        # Comprehensive unit tests (17 test cases)
+│   └── config.json                 # Configuration file with base URL and API endpoints
+├── logs/                           # Timestamped log files directory
+│   └── atlan_extractor_YYYY-MM-DD-HH-MM-SS.log
+├── output/                         # Timestamped CSV output files directory
+│   ├── connections_YYYY-MM-DD-HH-MM-SS.csv
+│   ├── databases_YYYY-MM-DD-HH-MM-SS.csv
+│   └── connections-databases_YYYY-MM-DD-HH-MM-SS.csv
+├── test_atlan_extractor.py        # Comprehensive unit tests (14 test cases)
 ├── project_requirements.txt       # Project dependencies
 ├── .gitignore                     # Git ignore file
 └── README.md                      # This file
@@ -72,41 +67,31 @@ python -c "import requests, coverage; print('All dependencies installed successf
 
 ## Configuration
 
-### Multi-Subdomain Authentication
+### Authentication
 
-The script supports multiple authentication methods for processing multiple Atlan subdomains:
+The script requires a Bearer token for Atlan API authentication. You can provide this in two ways:
 
-**Option 1: Subdomain-Specific Tokens (Recommended for Multi-Subdomain)**
-Configure individual tokens for each subdomain in `configs/config.json`:
+**Option 1: Environment Variable (Recommended)**
+```bash
+export ATLAN_AUTH_TOKEN="your_actual_bearer_token_here"
+```
+
+**Option 2: Configuration File**
+Add your token to the `configs/config.json` file:
 ```json
 {
-  "subdomain_auth_token_map": {
-    "xyz": "xyz_authentication_token_here",
-    "abc": "abc_authentication_token_here",
-    "lmn": "lmn_authentication_token_here"
-  }
+  "auth_token": "your_actual_bearer_token_here"
 }
 ```
 
-**Option 2: Environment Variable (Single Token for All Subdomains)**
-```bash
-export ATLAN_AUTH_TOKEN="your_universal_bearer_token_here"
-```
+### API Endpoints Configuration
 
-### Multi-Subdomain Configuration
-
-Update the `configs/config.json` file with your multiple Atlan instance details:
+Update the `configs/config.json` file with your Atlan instance details:
 
 ```json
 {
-  "base_url_template": "https://{subdomain}.atlan.com",
-  "subdomain_auth_token_map": {
-    "xyz": "xyz_authentication_token_here",
-    "abc": "abc_authentication_token_here",
-    "lmn": "lmn_authentication_token_here"
-  },
   "connections_api": {
-    "url": "/api/getConnections",
+    "url": "https://your-company.atlan.com/api/meta/search/indexsearch",
     "payload": {
       "dsl": {
         "size": 400,
@@ -116,21 +101,11 @@ Update the `configs/config.json` file with your multiple Atlan instance details:
         "aggs": {}
       },
       "attributes": ["connectorName", "isPartial"],
-      "suppressLogs": true,
-      "requestMetadata": {
-        "utmTags": ["page_glossary", "project_webapp", "action_bootstrap", "action_fetch_connections"]
-      }
+      "suppressLogs": true
     }
   },
-  "api_map": {
-    "databricks": "databases_api",
-    "snowflake": "databases_api",
-    "oracle": "databases_api",
-    "tableau": "tableau_api",
-    "alteryx": "alteryx_api"
-  },
   "databases_api": {
-    "url": "/api/getDatabases",
+    "url": "https://your-company.atlan.com/api/meta/search/indexsearch",
     "payload": {
       "dsl": {
         "sort": [{"name.keyword": {"order": "asc"}}],
@@ -156,120 +131,58 @@ Update the `configs/config.json` file with your multiple Atlan instance details:
 }
 ```
 
-**Key Configuration Elements:**
-- `base_url_template`: URL template with `{subdomain}` placeholder for dynamic subdomain insertion
-- `subdomain_auth_token_map`: Maps each subdomain to its corresponding authentication token
-- `api_map`: Maps connector types to their corresponding API configurations
-- `PLACEHOLDER_TO_BE_REPLACED`: Automatically replaced with connection qualified names during execution
-
-**Adding New Subdomains:**
-To process additional Atlan instances, add new entries to the `subdomain_auth_token_map`:
-```json
-"subdomain_auth_token_map": {
-  "production": "prod_token_here",
-  "staging": "staging_token_here",
-  "development": "dev_token_here"
-}
-```
-
 ## Usage
 
-### Running the Multi-Subdomain Data Extractor
+### Running the Data Extractor
 
-1. **Standard multi-subdomain execution:**
+1. **Basic execution:**
 ```bash
 python main.py
 ```
-This processes all subdomains defined in `subdomain_auth_token_map` configuration.
 
-2. **With environment variable override:**
+2. **With custom config file:**
 ```bash
-ATLAN_AUTH_TOKEN="universal_token" python main.py
-```
-This uses a single token for all subdomains (useful for testing or when all instances share the same authentication).
-
-3. **Example execution output:**
-```
-2025-06-11 15:30:45 - INFO - Starting multi-subdomain Atlan data extraction process
-2025-06-11 15:30:45 - INFO - Found 3 subdomains to process: ['xyz', 'abc', 'lmn']
-2025-06-11 15:30:45 - INFO - Starting data extraction for subdomain: xyz
-2025-06-11 15:30:46 - INFO - Completed processing for subdomain: xyz
-2025-06-11 15:30:46 - INFO - Multi-subdomain extraction completed!
-2025-06-11 15:30:46 - INFO - Processed 3/3 subdomains successfully
-2025-06-11 15:30:46 - INFO - Total connections across all subdomains: 127
-2025-06-11 15:30:46 - INFO - Total databases across all subdomains: 543
+python main.py custom_config.json
 ```
 
-### Expected Multi-Subdomain Output
+3. **With environment variable for authentication:**
+```bash
+ATLAN_AUTH_TOKEN="your_token" python main.py
+```
 
-The script generates timestamped CSV files with subdomain prefixes for each configured subdomain in the `output/` directory:
+### Expected Output
 
-**Per Subdomain Files Generated:**
+The script will generate two CSV files in the `output/` directory:
 
-**subdomain.connections_YYYY-MM-DD-HH-MM-SS.csv** - Connection data:
-- name (connection display name)
-- connection_qualified_name (unique identifier)
-- connector_name (e.g., databricks, snowflake)
-- updated_by
-- created_by
-- create_time
-- update_time
-
-**subdomain.databases_YYYY-MM-DD-HH-MM-SS.csv** - Database data:
-- connection_qualified_name (parent connection)
-- type_name (entity type, typically "Database")
-- qualified_name (unique database identifier)
-- name (database display name)
-- created_by
-- updated_by
-- create_time
-- update_time
-
-**subdomain.connections-databases_YYYY-MM-DD-HH-MM-SS.csv** - Enhanced combined dataset:
-- **subdomain** (first column - identifies the Atlan instance)
-- connector_name
+**output/connections.csv** - Contains connection data with columns:
 - connection_name
+- connection_qualified_name
+- connector_name
 - category
+- created_by
+- updated_by
+- create_time
+- update_time
+
+**output/databases.csv** - Contains database data with columns:
 - type_name
-- name (database name, empty if no databases found)
+- qualified_name
+- name
+- created_by
+- updated_by
+- create_time
+- update_time
+- connection_qualified_name
 
-**Example Multi-Subdomain Output:**
-```
-output/
-├── xyz.connections_2025-06-11-15-30-45.csv
-├── xyz.databases_2025-06-11-15-30-45.csv
-├── xyz.connections-databases_2025-06-11-15-30-45.csv
-├── abc.connections_2025-06-11-15-30-45.csv
-├── abc.databases_2025-06-11-15-30-45.csv
-├── abc.connections-databases_2025-06-11-15-30-45.csv
-├── lmn.connections_2025-06-11-15-30-45.csv
-├── lmn.databases_2025-06-11-15-30-45.csv
-└── lmn.connections-databases_2025-06-11-15-30-45.csv
-```
+### Execution Flow
 
-**Enhanced Combined CSV with Subdomain Tracking:**
-```csv
-subdomain,connector_name,connection_name,category,type_name,name
-xyz,databricks,prod-cluster,lake,Database,analytics_db
-xyz,snowflake,warehouse-01,warehouse,Database,reporting_db
-abc,tableau,visualization-server,visualization,,
-lmn,databricks,dev-cluster,lake,Database,test_db
-```
-
-### Multi-Subdomain Execution Flow
-
-1. **Load Multi-Subdomain Configuration**: Reads base_url_template and subdomain_auth_token_map from configs/config.json
-2. **Initialize Processing**: Creates output/ and logs/ directories, performs 30-day file cleanup
-3. **Process Each Subdomain Sequentially**:
-   - Extract subdomain name from subdomain_auth_token_map
-   - Generate subdomain-specific base URL using template
-   - Create dedicated log file: `subdomain.atlan_extractor_timestamp.log`
-   - Fetch connections using subdomain-specific authentication
-   - Export connections to: `subdomain.connections_timestamp.csv`
-   - For each connection, fetch associated databases using connector-specific APIs
-   - Export databases to: `subdomain.databases_timestamp.csv`
-   - Create enhanced combined CSV with subdomain column: `subdomain.connections-databases_timestamp.csv`
-4. **Completion Summary**: Log overall statistics across all processed subdomains
+1. **Load Configuration**: Reads API endpoints and authentication from configs/config.json
+2. **Create Output Directory**: Creates `output/` directory if it doesn't exist
+3. **Fetch Connections**: Makes POST request to connections API (URL logged)
+4. **Export Connections**: Saves connection data to output/connections.csv
+5. **Fetch Databases**: For each connection, fetches associated databases (URLs logged)
+6. **Export Databases**: Saves all database data to output/databases.csv
+7. **Logging**: All operations, including API URLs, are logged to console and atlan_extractor.log
 
 ## Testing
 
@@ -298,24 +211,22 @@ python -m coverage html
 
 ### Test Features
 
-The comprehensive test suite validates:
-- **Multi-Subdomain Configuration**: Tests subdomain_auth_token_map parsing and URL template functionality
-- **Subdomain-Specific Processing**: Tests individual subdomain processing with dedicated authentication
-- **Enhanced Combined CSV**: Tests subdomain column as first field in combined dataset
-- **String Replacement Functionality**: Tests payload modification using PLACEHOLDER_TO_BE_REPLACED approach
-- **Base URL Template System**: Tests dynamic URL generation from template and subdomain mapping
-- **Timestamped Filenames**: Tests generation of timestamped log and CSV files with subdomain prefixes
-- **Combined CSV Left Join**: Tests joining of connections and databases ensuring all connections appear
-- **File Cleanup**: Tests automatic deletion of files older than 30 days from logs/ and output/ directories
-- **Multi-Connector Support**: Tests API mapping for different connector types (databricks, tableau, etc.)
-- **Authentication Handling**: Tests subdomain-specific tokens vs environment variable priority
-- **Error Handling**: Tests network failures, invalid responses, and edge cases
-- **CSV Export Operations**: Tests individual and combined file creation with proper column ordering
-- **Directory Management**: Tests automatic creation of logs/ and output/ directories
+The updated test suite validates:
+- **String Replacement Functionality**: Tests the new payload modification approach using string search and replace
+- **Configs Directory Structure**: Tests the new configs/ directory for configuration files
+- **URL Logging**: Validates that API URLs are properly logged during requests
+- **Output Directory**: Tests CSV export functionality to output/ directory
+- **Combined CSV Left Join**: Tests the joining of connections and databases with left join logic
+- **Timestamped Filenames**: Tests generation of timestamped log and CSV files
+- **File Cleanup**: Tests automatic deletion of files older than 30 days
+- **Base URL Configuration**: Tests proper URL combination from base URL and endpoints
+- Authentication token handling (environment vs config)
+- JSON processing and data extraction
+- Error handling and edge cases
 
 ### Test Coverage Results
 
-The test suite achieves comprehensive coverage with 17 focused test cases covering:
+The test suite achieves comprehensive coverage with 14 focused test cases covering:
 
 - **Configuration Management**: Valid/invalid config files, authentication methods
 - **API Request Handling**: Success scenarios, HTTP errors, network failures, JSON parsing
