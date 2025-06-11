@@ -425,6 +425,89 @@ def export_databases_to_csv(databases, filename=None):
         logger.error(f"Failed to write databases CSV file: {e}")
 
 
+def create_combined_csv(connections, databases, filename=None):
+    """
+    Create a combined CSV file by joining connections and databases data.
+    
+    Performs a left join based on connection_qualified_name to ensure all 
+    connections appear in the result even when there are no matching databases.
+    
+    Args:
+        connections (list): List of connection dictionaries
+        databases (list): List of database dictionaries
+        filename (str): Output CSV filename (default: timestamped combined file)
+        
+    Returns:
+        None: Function writes to file and logs results
+        
+    Raises:
+        None: All exceptions are caught and logged
+    """
+    # Check if there's connections data to export
+    if not connections:
+        logger.warning("No connections data available for combined file")
+        return
+
+    # Generate timestamped filename if not provided
+    if filename is None:
+        filename = f'connections-databases_{timestamp}.csv'
+
+    logger.info(f"Creating combined file with {len(connections)} connections and {len(databases)} databases")
+
+    # Create a lookup dictionary for databases by connection_qualified_name
+    databases_by_connection = {}
+    for db in databases:
+        conn_qualified_name = db.get('connection_qualified_name', '')
+        if conn_qualified_name not in databases_by_connection:
+            databases_by_connection[conn_qualified_name] = []
+        databases_by_connection[conn_qualified_name].append(db)
+
+    # Define CSV column headers in the specified order
+    fieldnames = ['connector_name', 'connection_name', 'category', 'type_name', 'name']
+    
+    combined_data = []
+    
+    # Perform left join: iterate through connections and add matching databases
+    for connection in connections:
+        conn_qualified_name = connection.get('connection_qualified_name', '')
+        matching_databases = databases_by_connection.get(conn_qualified_name, [])
+        
+        if matching_databases:
+            # Add a row for each matching database
+            for database in matching_databases:
+                combined_row = {
+                    'connector_name': connection.get('connector_name', ''),
+                    'connection_name': connection.get('connection_name', ''),
+                    'category': connection.get('category', ''),
+                    'type_name': database.get('type_name', ''),
+                    'name': database.get('name', '')
+                }
+                combined_data.append(combined_row)
+        else:
+            # Add connection row with empty database fields (left join behavior)
+            combined_row = {
+                'connector_name': connection.get('connector_name', ''),
+                'connection_name': connection.get('connection_name', ''),
+                'category': connection.get('category', ''),
+                'type_name': '',
+                'name': ''
+            }
+            combined_data.append(combined_row)
+
+    try:
+        # Create full path to output directory
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        # Write combined data to CSV file with UTF-8 encoding
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()  # Write column headers
+            writer.writerows(combined_data)  # Write data rows
+            logger.info(f"Successfully created combined file: {filepath} with {len(combined_data)} rows")
+    except IOError as e:
+        # Handle file permission or disk space errors
+        logger.error(f"Failed to write combined CSV file: {e}")
+
+
 def main():
     """
     Main execution function that orchestrates the complete data extraction workflow.
@@ -435,7 +518,8 @@ def main():
     3. Export connections data to timestamped CSV file
     4. For each connection, fetch associated databases
     5. Export all databases data to timestamped CSV file
-    6. Log completion summary
+    6. Create combined CSV file by joining connections and databases
+    7. Log completion summary
     
     Raises:
         SystemExit: If no connections are found or critical errors occur
