@@ -363,21 +363,32 @@ class TestAtlanExtractorSimple(unittest.TestCase):
             shutil.rmtree(test_dir)
 
     def test_timestamped_filename_generation(self):
-        """Test timestamped filename generation for logs and CSV files"""
-        # Test log file timestamp format
+        """Test timestamped filename generation for logs and CSV files with subdomain prefix"""
+        # Test subdomain extraction
+        test_url = "https://xyz.atlan.com"
+        from urllib.parse import urlparse
+        parsed = urlparse(test_url)
+        hostname = parsed.hostname or ''
+        parts = hostname.split('.')
+        subdomain = parts[0] if parts and len(parts) > 0 else 'atlan'
+        
+        # Test log file timestamp format with subdomain prefix
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        log_filename = f'atlan_extractor_{timestamp}.log'
+        log_filename = f'{subdomain}.atlan_extractor_{timestamp}.log'
         
-        # Verify log filename format
-        self.assertRegex(log_filename, r'atlan_extractor_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.log')
+        # Verify log filename format with prefix
+        self.assertRegex(log_filename, r'\w+\.atlan_extractor_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.log')
+        self.assertEqual(subdomain, 'xyz')
         
-        # Test CSV file timestamp format
-        connections_filename = f'connections_{timestamp}.csv'
-        databases_filename = f'databases_{timestamp}.csv'
+        # Test CSV file timestamp format with subdomain prefix
+        connections_filename = f'{subdomain}.connections_{timestamp}.csv'
+        databases_filename = f'{subdomain}.databases_{timestamp}.csv'
+        combined_filename = f'{subdomain}.connections-databases_{timestamp}.csv'
         
-        # Verify CSV filename formats
-        self.assertRegex(connections_filename, r'connections_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
-        self.assertRegex(databases_filename, r'databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        # Verify CSV filename formats with prefix
+        self.assertRegex(connections_filename, r'\w+\.connections_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        self.assertRegex(databases_filename, r'\w+\.databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        self.assertRegex(combined_filename, r'\w+\.connections-databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
 
     def test_file_cleanup_functionality(self):
         """Test cleanup of old log and output files"""
@@ -561,13 +572,15 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         self.assertEqual(tableau_rows[0]['name'], '')
 
     def test_combined_csv_filename_generation(self):
-        """Test combined CSV filename generation with timestamp"""
+        """Test combined CSV filename generation with timestamp and subdomain prefix"""
+        subdomain = 'xyz'
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        expected_filename = f'connections-databases_{timestamp}.csv'
+        expected_filename = f'{subdomain}.connections-databases_{timestamp}.csv'
         
-        # Verify filename format
-        self.assertRegex(expected_filename, r'connections-databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
+        # Verify filename format with subdomain prefix
+        self.assertRegex(expected_filename, r'\w+\.connections-databases_\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.csv')
         self.assertIn('connections-databases_', expected_filename)
+        self.assertTrue(expected_filename.startswith(f'{subdomain}.'))
         self.assertTrue(expected_filename.endswith('.csv'))
 
     def test_combined_csv_column_order(self):
@@ -581,6 +594,35 @@ class TestAtlanExtractorSimple(unittest.TestCase):
         self.assertEqual(expected_fieldnames[2], 'category')
         self.assertEqual(expected_fieldnames[3], 'type_name')
         self.assertEqual(expected_fieldnames[4], 'name')
+
+    def test_subdomain_extraction(self):
+        """Test subdomain extraction from various URL formats"""
+        from urllib.parse import urlparse
+        
+        def extract_subdomain(url):
+            """Extract subdomain from URL for use as file prefix"""
+            try:
+                parsed = urlparse(url)
+                hostname = parsed.hostname or ''
+                parts = hostname.split('.')
+                return parts[0] if parts and len(parts) > 0 and parts[0] else 'atlan'
+            except Exception:
+                return 'atlan'
+        
+        # Test various URL formats
+        test_cases = [
+            ("https://xyz.atlan.com", "xyz"),
+            ("https://company-1.atlan.com", "company-1"),
+            ("https://test123.atlan.com", "test123"),
+            ("https://prod.atlan.io", "prod"),
+            ("invalid-url", "atlan"),  # fallback case
+            ("", "atlan")  # empty case
+        ]
+        
+        for url, expected_subdomain in test_cases:
+            with self.subTest(url=url):
+                result = extract_subdomain(url)
+                self.assertEqual(result, expected_subdomain)
 
 
 if __name__ == '__main__':

@@ -32,40 +32,12 @@ LOGS_DIR = 'logs'
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
-# Generate timestamped log filename with subdomain prefix
+# Generate timestamp for all files
 timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
-# Temporarily create log file without prefix to load config first
-temp_log_filename = os.path.join(LOGS_DIR, f'atlan_extractor_{timestamp}.log')
-
-# Configure logging to both file and console for comprehensive monitoring
-# Log level INFO provides detailed execution flow without debug verbosity
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_filename),  # Timestamped log file in logs directory
-        logging.StreamHandler(sys.stdout)  # Real-time console output
-    ])
-
-logger = logging.getLogger(__name__)
-
-# Load configuration from JSON file containing API endpoints and payloads
-# This file must exist in the configs directory
+# Load configuration first to get base URL
 with open('configs/config.json', 'r') as f:
     config = json.load(f)
-
-# Create output directory for CSV files if it doesn't exist
-OUTPUT_DIR = 'output'
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-    logger.info(f"Created output directory: {OUTPUT_DIR}")
-
-# Extract base URL from configuration
-BASE_URL = config.get('base_url', '')
-if not BASE_URL:
-    logger.error("Base URL not found in configuration")
-    sys.exit(1)
 
 # Extract subdomain from base URL for file prefixes
 def extract_subdomain(url):
@@ -76,11 +48,39 @@ def extract_subdomain(url):
         hostname = parsed.hostname or ''
         # Extract first part before .atlan.com or similar
         parts = hostname.split('.')
-        return parts[0] if parts and len(parts) > 0 else 'atlan'
+        return parts[0] if parts and len(parts) > 0 and parts[0] else 'atlan'
     except Exception:
         return 'atlan'
 
+BASE_URL = config.get('base_url', '')
+if not BASE_URL:
+    print("ERROR: Base URL not found in configuration")
+    sys.exit(1)
+
 SUBDOMAIN_PREFIX = extract_subdomain(BASE_URL)
+
+# Generate prefixed log filename
+log_filename = os.path.join(LOGS_DIR, f'{SUBDOMAIN_PREFIX}.atlan_extractor_{timestamp}.log')
+
+# Configure logging to both file and console for comprehensive monitoring
+# Log level INFO provides detailed execution flow without debug verbosity
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_filename),  # Prefixed timestamped log file in logs directory
+        logging.StreamHandler(sys.stdout)  # Real-time console output
+    ])
+
+logger = logging.getLogger(__name__)
+
+# Create output directory for CSV files if it doesn't exist
+OUTPUT_DIR = 'output'
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+    logger.info(f"Created output directory: {OUTPUT_DIR}")
+
+logger.info(f"Using subdomain prefix: {SUBDOMAIN_PREFIX}")
 
 
 def cleanup_old_files():
@@ -94,23 +94,31 @@ def cleanup_old_files():
     cutoff_date = datetime.now() - timedelta(days=30)
     files_deleted = 0
     
-    # Clean up old log files
-    log_pattern = os.path.join(LOGS_DIR, 'atlan_extractor_*.log')
-    for log_file in glob.glob(log_pattern):
-        try:
-            file_time = datetime.fromtimestamp(os.path.getmtime(log_file))
-            if file_time < cutoff_date:
-                os.remove(log_file)
-                files_deleted += 1
-                logger.info(f"Deleted old log file: {log_file}")
-        except OSError as e:
-            logger.warning(f"Could not delete log file {log_file}: {e}")
+    # Clean up old log files (both prefixed and non-prefixed for backward compatibility)
+    log_patterns = [
+        os.path.join(LOGS_DIR, 'atlan_extractor_*.log'),
+        os.path.join(LOGS_DIR, '*.atlan_extractor_*.log')
+    ]
     
-    # Clean up old output files
+    for pattern in log_patterns:
+        for log_file in glob.glob(pattern):
+            try:
+                file_time = datetime.fromtimestamp(os.path.getmtime(log_file))
+                if file_time < cutoff_date:
+                    os.remove(log_file)
+                    files_deleted += 1
+                    logger.info(f"Deleted old log file: {log_file}")
+            except OSError as e:
+                logger.warning(f"Could not delete log file {log_file}: {e}")
+    
+    # Clean up old output files (both prefixed and non-prefixed for backward compatibility)
     output_patterns = [
         os.path.join(OUTPUT_DIR, 'connections_*.csv'),
         os.path.join(OUTPUT_DIR, 'databases_*.csv'),
-        os.path.join(OUTPUT_DIR, 'connections-databases_*.csv')
+        os.path.join(OUTPUT_DIR, 'connections-databases_*.csv'),
+        os.path.join(OUTPUT_DIR, '*.connections_*.csv'),
+        os.path.join(OUTPUT_DIR, '*.databases_*.csv'),
+        os.path.join(OUTPUT_DIR, '*.connections-databases_*.csv')
     ]
     
     for pattern in output_patterns:
@@ -372,9 +380,9 @@ def export_connections_to_csv(connections, filename=None):
         logger.warning("No connections data to export")
         return
 
-    # Generate timestamped filename if not provided
+    # Generate timestamped filename with subdomain prefix if not provided
     if filename is None:
-        filename = f'connections_{timestamp}.csv'
+        filename = f'{SUBDOMAIN_PREFIX}.connections_{timestamp}.csv'
 
     logger.info(f"Exporting {len(connections)} connections to {filename}")
 
@@ -417,9 +425,9 @@ def export_databases_to_csv(databases, filename=None):
         logger.warning("No databases data to export")
         return
 
-    # Generate timestamped filename if not provided
+    # Generate timestamped filename with subdomain prefix if not provided
     if filename is None:
-        filename = f'databases_{timestamp}.csv'
+        filename = f'{SUBDOMAIN_PREFIX}.databases_{timestamp}.csv'
 
     logger.info(f"Exporting {len(databases)} databases to {filename}")
 
@@ -466,9 +474,9 @@ def create_combined_csv(connections, databases, filename=None):
         logger.warning("No connections data available for combined file")
         return
 
-    # Generate timestamped filename if not provided
+    # Generate timestamped filename with subdomain prefix if not provided
     if filename is None:
-        filename = f'connections-databases_{timestamp}.csv'
+        filename = f'{SUBDOMAIN_PREFIX}.connections-databases_{timestamp}.csv'
 
     logger.info(f"Creating combined file with {len(connections)} connections and {len(databases)} databases")
 
