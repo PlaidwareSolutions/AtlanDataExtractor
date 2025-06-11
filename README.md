@@ -34,7 +34,7 @@ atlan-data-extractor/
 │   ├── abc.connections_YYYY-MM-DD-HH-MM-SS.csv
 │   ├── abc.databases_YYYY-MM-DD-HH-MM-SS.csv
 │   └── abc.connections-databases_YYYY-MM-DD-HH-MM-SS.csv
-├── test_atlan_extractor.py        # Comprehensive unit tests (15 test cases)
+├── test_atlan_extractor.py        # Comprehensive unit tests (25 test cases)
 ├── project_requirements.txt       # Project dependencies
 ├── .gitignore                     # Git ignore file
 └── README.md                      # This file
